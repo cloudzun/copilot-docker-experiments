@@ -1,0 +1,19 @@
+{
+  "registry-mirrors": [
+    "https://registry.docker-cn.com",
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://hub-mirror.c.163.com"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  },
+  "storage-driver": "overlay2",
+  "data-root": "/var/lib/docker",
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "live-restore": true,
+  "userland-proxy": false,
+  "experimental": false,
+  "debug": false
+}
