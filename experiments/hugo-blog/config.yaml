@@ -1,0 +1,13 @@
+baseURL: 'http://localhost'
+languageCode: 'zh-cn'
+title: '我的Docker博客'
+defaultContentLanguage: 'zh-cn'
+
+params:
+  description: '使用Hugo和Docker构建的个人博客'
+
+# 确保正确解析中文内容
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
