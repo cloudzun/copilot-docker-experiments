@@ -1,5 +1,7 @@
 # 01-Level1-Container-Fundamentals.md
 
+<meta charset="UTF-8">
+
 # 📚 Level 1: 容器基础与Docker实践
 
 > **学习目标**: 掌握Docker容器化基础技术，能够独立构建和管理多容器应用  
@@ -52,47 +54,202 @@ Module 4: 多容器编排 → Module 5: 微服务架构 → Module 6: 项目整�
 ### 🛠️ 实践操作 (4小时)
 
 #### 1.4 环境验证与基本命令
-```bash
-# 验证Docker安装
-docker --version
-docker info
 
-# 基本命令练习
-docker pull nginx:latest        # 拉取镜像
-docker images                   # 查看本地镜像
-docker run -d -p 8080:80 nginx  # 运行容器
-docker ps                       # 查看运行容器
-docker logs <container_id>      # 查看日志
-docker exec -it <container_id> /bin/bash  # 进入容器
-docker stop <container_id>      # 停止容器
-docker rm <container_id>        # 删除容器
+**步骤1: 验证Docker安装**
+```bash
+# 查看Docker版本
+docker --version
+```
+*预期输出*: `Docker version 26.1.3, build ...`
+
+```bash
+# 查看Docker系统信息
+docker info
+```
+*预期输出*: 显示Docker守护进程状态、存储驱动等详细信息
+
+**步骤2: 镜像操作练习**
+```bash
+# 拉取nginx镜像
+docker pull nginx:latest
+```
+*说明*: 从Docker Hub下载最新版本的nginx镜像
+
+```bash
+# 查看本地镜像列表
+docker images
+```
+*预期输出*: 显示本地所有镜像，包括刚下载的nginx
+
+```bash
+# 查看镜像详细信息
+docker inspect nginx:latest
+```
+*说明*: 显示镜像的详细配置信息，包括层信息、环境变量等
+
+**步骤3: 运行第一个容器**
+```bash
+# 运行nginx容器（后台模式）
+docker run -d -p 8080:80 nginx
+```
+*说明*: `-d` 后台运行，`-p 8080:80` 端口映射（宿主机8080映射到容器80）
+
+```bash
+# 查看运行中的容器
+docker ps
+```
+*预期输出*: 显示正在运行的容器列表，包括容器ID、镜像、端口等信息
+
+```bash
+# 测试访问
+curl http://localhost:8080
+```
+*预期输出*: 显示nginx默认欢迎页面的HTML内容
+
+**步骤4: 容器日志和交互操作**
+```bash
+# 查看容器日志
+docker logs <container_id>
+```
+*说明*: 将`<container_id>`替换为实际的容器ID（从docker ps获得）
+
+```bash
+# 进入容器内部
+docker exec -it <container_id> /bin/bash
+```
+*说明*: `-it` 交互模式，进入容器后可以执行bash命令
+
+```bash
+# 在容器内部查看nginx进程（容器内执行）
+ps aux | grep nginx
+```
+
+```bash
+# 退出容器（容器内执行）
+exit
+```
+
+**步骤5: 容器停止和清理**
+```bash
+# 停止容器
+docker stop <container_id>
+```
+
+```bash
+# 查看所有容器（包括已停止的）
+docker ps -a
+```
+
+```bash
+# 删除容器
+docker rm <container_id>
+```
+
+```bash
+# 删除镜像
+docker rmi nginx:latest
 ```
 
 #### 1.5 容器生命周期管理
+
+**步骤1: 容器状态转换演示**
 ```bash
-# 容器状态转换
-docker create nginx:latest      # 创建容器 (未启动)
-docker start <container_id>     # 启动容器
-docker pause <container_id>     # 暂停容器
-docker unpause <container_id>   # 恢复容器
-docker restart <container_id>   # 重启容器
-docker kill <container_id>      # 强制停止容器
+# 重新拉取nginx镜像
+docker pull nginx:latest
+```
+
+```bash
+# 创建容器但不启动
+docker create --name my-nginx -p 8081:80 nginx:latest
+```
+*说明*: `--name` 给容器指定名称，便于管理
+
+```bash
+# 查看容器状态（应该是Created）
+docker ps -a
+```
+
+```bash
+# 启动已创建的容器
+docker start my-nginx
+```
+
+```bash
+# 验证容器运行状态
+docker ps
+```
+
+**步骤2: 容器暂停和恢复**
+```bash
+# 暂停容器
+docker pause my-nginx
+```
+
+```bash
+# 查看容器状态（应该显示Paused）
+docker ps
+```
+
+```bash
+# 尝试访问（应该无响应）
+timeout 3 curl http://localhost:8081 || echo "Container is paused"
+```
+
+```bash
+# 恢复容器
+docker unpause my-nginx
+```
+
+```bash
+# 验证恢复（应该正常响应）
+curl http://localhost:8081
+```
+
+**步骤3: 容器重启和强制停止**
+```bash
+# 重启容器
+docker restart my-nginx
+```
+
+```bash
+# 查看重启后的运行时间
+docker ps
+```
+
+```bash
+# 强制停止容器
+docker kill my-nginx
+```
+
+```bash
+# 清理容器
+docker rm my-nginx
 ```
 
 ### 🎪 动手项目: 运行第一个Web应用
 
 **项目目标**: 部署一个自定义的静态网站
 
+**步骤1: 创建项目目录**
 ```bash
-# 1. 创建项目目录
-mkdir my-first-website && cd my-first-website
+# 创建工作目录
+mkdir my-first-website
+```
 
-# 2. 创建简单的HTML页面
-cat > index.html << EOF
+```bash
+# 进入项目目录
+cd my-first-website
+```
+
+**步骤2: 创建网站内容**
+```bash
+# 创建HTML页面
+cat > index.html << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
     <title>我的第一个Docker网站</title>
+    <meta charset="UTF-8">
 </head>
 <body>
     <h1>欢迎来到Docker世界！</h1>
@@ -100,12 +257,37 @@ cat > index.html << EOF
 </body>
 </html>
 EOF
+```
+*说明*: 创建一个简单的HTML页面作为网站内容
 
-# 3. 使用数据卷挂载运行
-docker run -d -p 8080:80 -v $(pwd):/usr/share/nginx/html nginx:latest
+**步骤3: 使用数据卷部署**
+```bash
+# 使用nginx镜像并挂载当前目录
+docker run -d -p 8080:80 -v $(pwd):/usr/share/nginx/html --name my-website nginx:latest
+```
+*说明*: `-v $(pwd):/usr/share/nginx/html` 将当前目录挂载到nginx的web根目录
 
-# 4. 访问测试
+**步骤4: 验证部署**
+```bash
+# 测试网站访问
 curl http://localhost:8080
+```
+*预期输出*: 显示我们创建的HTML页面内容
+
+```bash
+# 查看容器状态
+docker ps
+```
+
+**步骤5: 清理资源**
+```bash
+# 停止并删除容器
+docker stop my-website
+```
+
+```bash
+# 删除容器
+docker rm my-website
 ```
 
 **🤖 AI辅助提示**: 使用GitHub Copilot生成Docker命令脚本和HTML模板
@@ -165,8 +347,17 @@ CMD ["nginx", "-g", "daemon off;"]
 ### 🛠️ 实践操作 (5小时)
 
 #### 2.4 构建第一个自定义镜像
-```dockerfile
-# Dockerfile
+
+**步骤1: 准备构建环境**
+```bash
+# 创建构建目录
+mkdir my-custom-nginx && cd my-custom-nginx
+```
+
+**步骤2: 创建Dockerfile**
+```bash
+# 创建Dockerfile
+cat > Dockerfile << 'EOF'
 FROM nginx:alpine
 
 # 添加自定义配置
@@ -183,35 +374,127 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost/ || exit 1
 
 EXPOSE 80
+EOF
 ```
 
-#### 2.5 镜像构建与标记
+**步骤3: 创建配置文件**
 ```bash
-# 构建镜像
+# 创建nginx配置
+cat > nginx.conf << 'EOF'
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    
+    server {
+        listen 80;
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+    }
+}
+EOF
+```
+
+**步骤4: 创建网站内容**
+```bash
+# 创建html目录
+mkdir html
+```
+
+```bash
+# 创建首页
+cat > html/index.html << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>自定义Nginx镜像</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>这是我的自定义Docker镜像！</h1>
+    <p>构建时间: 2024年10月</p>
+</body>
+</html>
+EOF
+```
+
+#### 2.5 镜像构建与管理
+
+**步骤1: 构建镜像**
+```bash
+# 构建镜像并指定标签
 docker build -t my-website:v1.0 .
+```
+*说明*: `.` 表示使用当前目录的Dockerfile进行构建
 
-# 查看构建历史
-docker history my-website:v1.0
-
-# 镜像标记
-docker tag my-website:v1.0 my-website:latest
-
-# 镜像大小分析
+**步骤2: 查看构建结果**
+```bash
+# 查看镜像列表
 docker images my-website
 ```
+
+```bash
+# 查看构建历史
+docker history my-website:v1.0
+```
+*说明*: 显示镜像各层的构建历史和大小
+
+**步骤3: 镜像标记管理**
+```bash
+# 添加latest标签
+docker tag my-website:v1.0 my-website:latest
+```
+
+```bash
+# 验证标签
+docker images my-website
+```
+*预期输出*: 应该看到两个标签指向同一个镜像ID
+
+**步骤4: 测试自定义镜像**
+```bash
+# 运行自定义镜像
+docker run -d -p 8081:80 --name custom-nginx my-website:v1.0
+```
+
+```bash
+# 测试访问
+curl http://localhost:8081
+```
+
+```bash
+# 查看健康检查状态
+docker ps
+```
+*说明*: STATUS列会显示健康检查结果
 
 ### 🎪 动手项目: 构建个人静态博客
 
 **项目目标**: 使用Hugo构建静态博客并容器化
 
-```dockerfile
-# 多阶段构建Dockerfile
+**步骤1: 创建项目结构**
+```bash
+# 创建博客项目目录
+mkdir hugo-blog && cd hugo-blog
+```
+
+**步骤2: 创建多阶段Dockerfile**
+```bash
+# 创建Dockerfile
+cat > Dockerfile << 'EOF'
+# 构建阶段
 FROM hugomods/hugo:latest AS builder
 
 WORKDIR /src
 COPY . .
 RUN hugo --minify --gc
 
+# 运行阶段
 FROM nginx:alpine
 COPY --from=builder /src/public /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -222,6 +505,105 @@ HEALTHCHECK --interval=30s --timeout=3s CMD \
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
+EOF
+```
+*说明*: 多阶段构建可以显著减小最终镜像大小
+
+**步骤3: 创建Hugo配置**
+```bash
+# 创建hugo配置文件
+cat > config.yaml << 'EOF'
+baseURL: 'http://localhost'
+languageCode: 'zh-cn'
+title: '我的Docker博客'
+theme: 'ananke'
+
+params:
+  description: '使用Hugo和Docker构建的个人博客'
+EOF
+```
+
+**步骤4: 创建示例内容**
+```bash
+# 创建内容目录
+mkdir -p content/posts
+```
+
+```bash
+# 创建第一篇文章
+cat > content/posts/first-post.md << 'EOF'
+---
+title: "我的第一篇Docker博客"
+date: 2024-10-15T10:00:00+08:00
+draft: false
+---
+
+# 欢迎来到我的博客
+
+这是使用Hugo和Docker构建的第一篇博客文章。
+
+## Docker的优势
+
+- 环境一致性
+- 快速部署
+- 易于扩展
+EOF
+```
+
+**步骤5: 创建nginx配置**
+```bash
+# 创建nginx配置文件
+cat > nginx.conf << 'EOF'
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    
+    server {
+        listen 80;
+        root /usr/share/nginx/html;
+        index index.html;
+        
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }
+}
+EOF
+```
+
+**步骤6: 构建和运行**
+```bash
+# 构建博客镜像
+docker build -t hugo-blog:latest .
+```
+
+```bash
+# 运行博客容器
+docker run -d -p 8082:80 --name my-blog hugo-blog:latest
+```
+
+```bash
+# 访问博客
+curl http://localhost:8082
+```
+
+**步骤7: 验证多阶段构建效果**
+```bash
+# 查看最终镜像大小
+docker images hugo-blog
+```
+*说明*: 应该比包含Hugo构建工具的镜像小很多
+
+```bash
+# 清理测试容器
+docker stop my-blog && docker rm my-blog
 ```
 
 **🤖 AI辅助提示**: 让Copilot帮助优化Dockerfile并生成nginx配置
@@ -246,19 +628,33 @@ none      # 无网络连接
 container # 共享其他容器的网络
 ```
 
-#### 3.2 自定义网络创建
+#### 3.2 自定义网络管理
+
+**网络类型对比**:
+- `bridge`: 默认模式，容器间可通过内网通信
+- `host`: 直接使用宿主机网络  
+- `none`: 无网络连接
+- `container`: 共享其他容器的网络
+
+**自定义网络命令**:
 ```bash
 # 创建自定义桥接网络
 docker network create --driver bridge my-network
+```
 
+```bash
 # 查看网络详情
 docker network inspect my-network
+```
 
+```bash
 # 容器连接到指定网络
 docker run -d --name app1 --network my-network nginx
 ```
 
 #### 3.3 数据持久化方案
+
+**存储类型对比**:
 ```
 ┌─────────────────┬─────────────────┬─────────────────┐
 │   Data Volumes  │  Bind Mounts    │   tmpfs mounts  │
@@ -272,44 +668,149 @@ docker run -d --name app1 --network my-network nginx
 ### 🛠️ 实践操作 (6小时)
 
 #### 3.4 网络配置实践
-```bash
-# 创建应用网络
-docker network create blog-network
 
-# 运行数据库容器
+**步骤1: 创建应用网络**
+```bash
+# 创建专用网络
+docker network create blog-network
+```
+*说明*: 为博客应用创建独立的网络环境
+
+```bash
+# 查看网络配置
+docker network ls
+```
+
+```bash
+# 查看网络详细信息
+docker network inspect blog-network
+```
+
+**步骤2: 部署数据库容器**
+```bash
+# 运行MySQL数据库
 docker run -d \
   --name blog-db \
   --network blog-network \
   -e MYSQL_ROOT_PASSWORD=secret123 \
   -e MYSQL_DATABASE=blog \
   mysql:8.0
+```
+*说明*: 数据库容器连接到自定义网络，通过容器名进行通信
 
-# 运行应用容器
+```bash
+# 查看数据库启动状态
+docker logs blog-db
+```
+
+**步骤3: 测试网络连通性**
+```bash
+# 创建测试容器连接到同一网络
+docker run -it --network blog-network --rm alpine sh
+```
+*在容器内执行*:
+```bash
+# 测试数据库连接（容器内执行）
+ping blog-db
+```
+
+```bash
+# 退出测试容器（容器内执行）
+exit
+```
+
+**步骤4: 部署应用容器**
+```bash
+# 运行应用容器（示例）
 docker run -d \
   --name blog-app \
   --network blog-network \
   -p 3000:3000 \
   -e DB_HOST=blog-db \
-  my-blog-app:latest
+  -e DB_USER=root \
+  -e DB_PASSWORD=secret123 \
+  nginx:alpine
 ```
+*说明*: 应用通过环境变量配置数据库连接
 
 #### 3.5 数据卷管理
+
+**步骤1: 创建和管理数据卷**
 ```bash
 # 创建命名卷
 docker volume create blog-data
+```
 
-# 使用数据卷
+```bash
+# 查看卷列表
+docker volume ls
+```
+
+```bash
+# 查看卷详细信息
+docker volume inspect blog-data
+```
+
+**步骤2: 使用数据卷持久化数据**
+```bash
+# 停止之前的数据库容器
+docker stop blog-db && docker rm blog-db
+```
+
+```bash
+# 重新创建带数据卷的数据库
 docker run -d \
-  --name database \
+  --name blog-db \
+  --network blog-network \
   -v blog-data:/var/lib/mysql \
+  -e MYSQL_ROOT_PASSWORD=secret123 \
+  -e MYSQL_DATABASE=blog \
   mysql:8.0
+```
+*说明*: 数据现在存储在持久化卷中，容器删除后数据仍然保留
 
-# 数据备份
+**步骤3: 数据备份和恢复**
+```bash
+# 创建备份目录
+mkdir -p ~/backups
+```
+
+```bash
+# 备份数据卷
 docker run --rm \
   -v blog-data:/data \
-  -v $(pwd):/backup \
-  alpine tar czf /backup/backup.tar.gz -C /data .
+  -v ~/backups:/backup \
+  alpine tar czf /backup/blog-backup-$(date +%Y%m%d).tar.gz -C /data .
 ```
+*说明*: 使用临时容器将数据卷内容打包备份
+
+```bash
+# 验证备份文件
+ls -la ~/backups/
+```
+
+**步骤4: 绑定挂载示例**
+```bash
+# 创建本地配置目录
+mkdir -p ~/blog-config
+```
+
+```bash
+# 创建配置文件
+echo "server_id=1" > ~/blog-config/my.cnf
+```
+
+```bash
+# 使用绑定挂载
+docker run -d \
+  --name blog-db-custom \
+  --network blog-network \
+  -v blog-data:/var/lib/mysql \
+  -v ~/blog-config:/etc/mysql/conf.d:ro \
+  -e MYSQL_ROOT_PASSWORD=secret123 \
+  mysql:8.0
+```
+*说明*: `:ro` 表示只读挂载，配置文件从宿主机加载
 
 ### 🎪 动手项目: 带数据库的动态博客
 
