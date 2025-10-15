@@ -328,21 +328,106 @@ ENTRYPOINT ["./entrypoint.sh"]  # 入口点
 ```
 
 #### 2.3 多阶段构建优化
-```dockerfile
-# 构建阶段
-FROM node:16 AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-RUN npm run build
 
-# 运行阶段
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+**什么是多阶段构建？**
+
+多阶段构建(Multi-stage builds)是Docker 17.05引入的功能，允许在一个Dockerfile中使用多个FROM指令，每个FROM指令开始一个新的构建阶段。这种技术主要用于：
+
+- **减小镜像体积**: 最终镜像只包含运行时必需的文件
+- **简化构建流程**: 在一个文件中完成构建和打包
+- **提高安全性**: 构建工具和源代码不会出现在最终镜像中
+- **优化构建缓存**: 不同阶段可以独立缓存
+
+**构建阶段对比**:
 ```
+┌─────────────────────────────────────────────────┐
+│                传统单阶段构建                     │
+├─────────────────────────────────────────────────┤
+│ FROM node:16                                    │
+│ • 包含完整Node.js环境 (~900MB)                   │
+│ • 包含源代码和依赖                               │
+│ • 包含构建工具 (npm, yarn等)                     │
+│ • 最终镜像体积大，安全风险高                      │
+└─────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────┐
+│                多阶段构建优化                     │
+├─────────────────────────────────────────────────┤
+│ Stage 1: FROM node:16 AS builder                │
+│ • 用于构建和编译                                 │
+│ • 安装依赖，执行构建命令                         │
+│ │                                               │
+│ Stage 2: FROM nginx:alpine                      │
+│ • 轻量级运行环境 (~15MB)                         │
+│ • 只复制构建产物                                 │
+│ • 最终镜像小且安全                               │
+└─────────────────────────────────────────────────┘
+```
+
+**示例Dockerfile详解**:
+```dockerfile
+# 构建阶段 - 用于编译和构建应用
+FROM node:16 AS builder
+# ↑ 使用Node.js 16作为构建环境，命名为"builder"
+
+WORKDIR /app
+# 设置工作目录为/app
+
+COPY package*.json ./
+# 优先复制package.json文件，利用Docker缓存机制
+# 如果package.json未变化，下面的npm install会使用缓存
+
+RUN npm install
+# 安装所有依赖（包括开发依赖）
+
+COPY . .
+# 复制所有源代码到容器中
+
+RUN npm run build
+# 执行构建命令，生成生产环境代码（通常在dist/目录）
+
+# 运行阶段 - 轻量级生产环境
+FROM nginx:alpine
+# ↑ 使用轻量级的nginx:alpine作为运行环境（仅约15MB）
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+# ↑ 关键指令：从builder阶段复制构建产物
+# 只复制必需的静态文件，不包含源码和node_modules
+
+EXPOSE 80
+# 声明容器对外暴露80端口
+
+CMD ["nginx", "-g", "daemon off;"]
+# 启动nginx服务器，-g "daemon off;"确保nginx在前台运行
+```
+
+**构建过程解析**:
+```bash
+# 第一阶段执行的操作
+1. 下载node:16镜像 (~900MB)
+2. 安装npm依赖
+3. 编译源代码
+4. 生成dist/目录
+
+# 第二阶段执行的操作  
+1. 下载nginx:alpine镜像 (~15MB)
+2. 从第一阶段复制dist/目录
+3. 配置nginx服务
+4. 生成最终镜像 (~20MB)
+```
+
+**优化效果对比**:
+```
+传统方式: node:16 + 源码 + node_modules ≈ 1.2GB
+多阶段构建: nginx:alpine + 静态文件 ≈ 20MB
+体积减少: 约98%！
+```
+
+**最佳实践提示**:
+- 构建阶段使用功能完整的基础镜像
+- 运行阶段使用最小化的基础镜像  
+- 合理利用.dockerignore排除不必要文件
+- 将经常变化的步骤放在Dockerfile后面
 
 ### 🛠️ 实践操作 (5小时)
 
@@ -473,15 +558,47 @@ docker ps
 ```
 *说明*: STATUS列会显示健康检查结果
 
+**步骤5: 清理实验容器**
+```bash
+# 停止容器
+docker stop custom-nginx
+```
+
+```bash
+# 删除容器
+docker rm custom-nginx
+```
+
+```bash
+# 查看容器是否已清理
+docker ps -a
+```
+*说明*: 应该看不到custom-nginx容器，养成及时清理的好习惯
+
 ### 🎪 动手项目: 构建个人静态博客
 
 **项目目标**: 使用Hugo构建静态博客并容器化
+
+**📊 预期成果**:
+- ✅ 多阶段构建的Docker镜像（约53MB）
+- ✅ 中文博客网站，包含文章列表和详细页面
+- ✅ 响应式设计，支持移动端访问
+- ✅ SEO友好的HTML结构和meta标签
+- ✅ Nginx静态文件服务，支持gzip压缩
+
+**🏗️ 技术架构**:
+```
+Hugo源码 → Docker构建阶段1(hugomods/hugo) → 静态文件生成
+                                              ↓
+最终镜像 ← Docker构建阶段2(nginx:alpine) ← 静态文件复制
+```
 
 **步骤1: 创建项目结构**
 ```bash
 # 创建博客项目目录
 mkdir hugo-blog && cd hugo-blog
 ```
+*说明*: 建立独立的项目目录，便于版本控制和项目管理
 
 **步骤2: 创建多阶段Dockerfile**
 ```bash
@@ -492,6 +609,8 @@ FROM hugomods/hugo:latest AS builder
 
 WORKDIR /src
 COPY . .
+
+# 直接构建，不要重新初始化站点
 RUN hugo --minify --gc
 
 # 运行阶段
@@ -499,15 +618,15 @@ FROM nginx:alpine
 COPY --from=builder /src/public /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# 添加健康检查
-HEALTHCHECK --interval=30s --timeout=3s CMD \
-  wget --quiet --tries=1 --spider http://localhost/ || exit 1
-
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 EOF
 ```
-*说明*: 多阶段构建可以显著减小最终镜像大小
+*关键说明*: 
+- **多阶段构建优势**: 最终镜像仅约53MB，比单阶段构建减少95%体积
+- **构建阶段修正**: 移除`hugo new site . --force`避免覆盖我们的配置文件
+- **--minify参数**: 压缩生成的HTML、CSS、JS文件，提升加载性能
+- **--gc参数**: 清理构建过程中的临时文件
 
 **步骤3: 创建Hugo配置**
 ```bash
@@ -516,12 +635,23 @@ cat > config.yaml << 'EOF'
 baseURL: 'http://localhost'
 languageCode: 'zh-cn'
 title: '我的Docker博客'
-theme: 'ananke'
+defaultContentLanguage: 'zh-cn'
 
 params:
   description: '使用Hugo和Docker构建的个人博客'
+
+# 确保正确解析中文内容
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
 EOF
 ```
+*关键配置说明*: 
+- **baseURL**: 设置博客的基础URL，生产环境需修改为实际域名
+- **languageCode**: 指定网站语言为简体中文，影响HTML lang属性
+- **defaultContentLanguage**: 确保Hugo正确处理中文内容和日期格式
+- **markup.goldmark.renderer.unsafe**: 允许在Markdown中使用HTML标签，增强内容灵活性
 
 **步骤4: 创建示例内容**
 ```bash
@@ -550,6 +680,115 @@ draft: false
 EOF
 ```
 
+**步骤4.1: 创建布局模板（解决主题问题）**
+```bash
+# 创建布局目录
+mkdir -p layouts/_default
+```
+*说明*: Hugo需要layouts目录来存放自定义模板，`_default`是默认模板目录
+
+```bash
+# 创建基础模板
+cat > layouts/_default/baseof.html << 'EOF'
+<!DOCTYPE html>
+<html lang="{{ site.Language.Lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }} | {{ site.Title }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { border-bottom: 1px solid #ccc; padding-bottom: 20px; margin-bottom: 20px; }
+        .post { margin-bottom: 30px; }
+        .post-title { color: #333; }
+        .post-date { color: #666; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><a href="{{ "/" | relURL }}">{{ site.Title }}</a></h1>
+        </header>
+        <main>
+            {{ block "main" . }}{{ end }}
+        </main>
+    </div>
+</body>
+</html>
+EOF
+```
+*模板关键要素解析*:
+- **{{ site.Language.Lang }}**: 动态输出语言代码，支持SEO和多语言
+- **{{ .Title }} | {{ site.Title }}**: 页面标题格式，有利于搜索引擎优化
+- **{{ "/" | relURL }}**: 生成相对URL，适应不同部署环境
+- **{{ block "main" . }}**: 定义内容块，子模板可以替换此部分
+- **响应式CSS**: 使用max-width确保在不同设备上正常显示
+
+```bash
+# 创建首页模板
+cat > layouts/_default/list.html << 'EOF'
+{{ define "main" }}
+<h2>最新文章</h2>
+{{ range .Pages }}
+<article class="post">
+    <h3 class="post-title"><a href="{{ .Permalink }}">{{ .Title }}</a></h3>
+    <p class="post-date">{{ .Date.Format "2006-01-02" }}</p>
+    <p>{{ .Summary }}</p>
+</article>
+{{ end }}
+{{ end }}
+EOF
+```
+*列表模板逻辑说明*:
+- **{{ range .Pages }}**: 遍历当前section下的所有页面
+- **{{ .Permalink }}**: 生成页面的永久链接
+- **{{ .Date.Format "2006-01-02" }}**: Go时间格式化，显示为YYYY-MM-DD格式
+- **{{ .Summary }}**: 自动生成页面摘要，通常是前70个字符
+
+```bash
+# 创建单页模板
+cat > layouts/_default/single.html << 'EOF'
+{{ define "main" }}
+<article class="post">
+    <h1 class="post-title">{{ .Title }}</h1>
+    <p class="post-date">{{ .Date.Format "2006-01-02" }}</p>
+    <div class="content">
+        {{ .Content }}
+    </div>
+</article>
+<p><a href="{{ "/" | relURL }}">← 返回首页</a></p>
+{{ end }}
+EOF
+```
+*单页模板特点*:
+- **{{ .Content }}**: 渲染Markdown内容为HTML
+- **导航链接**: 提供返回首页的用户友好导航
+
+```bash
+# 创建优化的首页模板（直接显示文章列表）
+cat > layouts/index.html << 'EOF'
+{{ define "main" }}
+<h2>欢迎来到我的博客</h2>
+<p>{{ site.Params.description }}</p>
+
+<h2>最新文章</h2>
+{{ range (where site.RegularPages "Section" "posts") }}
+<article class="post">
+    <h3 class="post-title"><a href="{{ .Permalink }}">{{ .Title }}</a></h3>
+    <p class="post-date">{{ .Date.Format "2006-01-02" }}</p>
+    <p>{{ .Summary }}</p>
+    <p><a href="{{ .Permalink }}">阅读全文 →</a></p>
+</article>
+{{ end }}
+{{ end }}
+EOF
+```
+*首页模板高级功能*:
+- **where过滤器**: `where site.RegularPages "Section" "posts"`仅显示posts目录下的文章
+- **site.RegularPages**: 获取所有常规页面，排除index页面
+- **动态描述**: 从配置文件读取博客描述，便于统一管理
+
 **步骤5: 创建nginx配置**
 ```bash
 # 创建nginx配置文件
@@ -577,36 +816,157 @@ http {
 }
 EOF
 ```
+*Nginx配置详细解析*:
+- **worker_connections 1024**: 设置每个worker进程的最大连接数，影响并发性能
+- **include mime.types**: 加载MIME类型映射，确保正确的Content-Type响应头
+- **gzip压缩**: 启用文本文件压缩，减少传输带宽，提升加载速度
+- **try_files指令**: 实现SPA路由支持，$uri找不到时回退到index.html
+- **静态文件优化**: 适合Hugo生成的静态网站的访问模式
 
 **步骤6: 构建和运行**
 ```bash
 # 构建博客镜像
 docker build -t hugo-blog:latest .
 ```
+*构建过程监控要点*:
+- 观察两个构建阶段的执行时间和输出
+- 第一阶段下载hugo镜像约467MB，第二阶段nginx:alpine仅15MB
+- Hugo生成页面数量应显示为10+页面（包括分类、标签等）
 
 ```bash
-# 运行博客容器
+# 如果构建成功，运行博客容器
 docker run -d -p 8082:80 --name my-blog hugo-blog:latest
 ```
+*容器运行参数说明*:
+- **-d**: 后台运行模式，容器在后台持续提供服务
+- **-p 8082:80**: 端口映射，宿主机8082端口映射到容器80端口
+- **--name**: 指定容器名称，便于后续管理和调试
 
 ```bash
-# 访问博客
+# 访问博客进行验证
 curl http://localhost:8082
 ```
+*验证检查点*:
+- 响应包含正确的HTML5文档结构
+- 网站标题显示为"我的Docker博客"
+- 页面语言属性为zh-cn
+- 包含文章列表和"阅读全文"链接
 
-**步骤7: 验证多阶段构建效果**
+**步骤7: 构建问题排除与优化验证**
+
+如果遇到构建错误，可以尝试以下解决方案：
+
+```bash
+# 方案1: 分阶段调试构建过程
+docker build --no-cache -t hugo-blog:debug . 2>&1 | tee build.log
+```
+*调试技巧*:
+- **--no-cache**: 禁用缓存，确保每步都重新执行
+- **2>&1**: 重定向错误输出到标准输出
+- **tee**: 同时输出到终端和文件，便于后续分析
+
+```bash
+# 方案2: 进入Hugo构建环境手动调试
+docker run -it --rm -v $(pwd):/src hugomods/hugo:latest sh
+# 在容器内执行以下命令
+# cd /src && ls -la
+# hugo --minify --gc --verbose
+```
+*手动调试价值*:
+- 验证文件结构是否正确
+- 检查Hugo配置文件语法
+- 观察详细的构建输出信息
+
+```bash
+# 方案3: 验证构建产物
+docker run --rm -v $(pwd):/src hugomods/hugo:latest hugo --minify --gc
+ls -la public/
+```
+*构建产物检查*:
+- public/index.html应该存在且包含正确内容
+- posts/目录应该包含文章页面
+- CSS和HTML应该被正确压缩
+
+**步骤8: 验证和清理**
 ```bash
 # 查看最终镜像大小
 docker images hugo-blog
 ```
-*说明*: 应该比包含Hugo构建工具的镜像小很多
+*镜像大小分析*:
+- 优化后的镜像大小应该在50-60MB左右
+- 相比传统方式减少约95%的体积
+- 主要组成：nginx:alpine基础镜像 + Hugo生成的静态文件
+
+```bash
+# 性能和功能验证
+curl -s http://localhost:8082 | grep -E "(title|博客|文章)"
+curl -s http://localhost:8082/posts/first-post/ | grep -E "(Docker|环境一致性)"
+```
+*功能验证要点*:
+- 首页应该显示博客标题和文章列表
+- 文章页面应该包含完整的Markdown渲染内容
+- 中文内容显示正常，无乱码问题
 
 ```bash
 # 清理测试容器
 docker stop my-blog && docker rm my-blog
 ```
+*清理说明*: 及时清理测试容器，避免端口冲突和资源占用
+
+```bash
+# 检查容器是否成功清理
+docker ps -a | grep hugo-blog || echo "✅ 容器已成功清理"
+```
+
+**🔧 故障排除提示**:
+- **Hugo配置错误**: 检查config.yaml语法，确保缩进正确，使用空格而非制表符
+- **模板错误**: 验证Hugo模板语法，特别是{{ }}标记的正确性
+- **权限问题**: 确保所有文件具有正确的读取权限(644)，目录权限为755
+- **网络问题**: 检查防火墙设置，确保8082端口可访问
+- **构建缓存问题**: 使用`docker build --no-cache`清除缓存重新构建
+- **中文编码问题**: 确保所有文件使用UTF-8编码保存
+
+**📈 性能优化建议**:
+- **镜像层缓存**: 将不常变化的COPY指令放在前面，利用Docker层缓存
+- **Nginx优化**: 启用gzip压缩，设置适当的缓存头
+- **Hugo构建**: 使用--minify参数压缩输出，--gc清理临时文件
+- **多平台支持**: 使用`docker buildx`构建多架构镜像
 
 **🤖 AI辅助提示**: 让Copilot帮助优化Dockerfile并生成nginx配置
+
+### 🎯 项目成功验收标准
+
+完成Hugo博客项目后，您应该能够：
+
+1. **技术掌握验证** ✅
+   ```bash
+   # 验证镜像构建成功
+   docker images hugo-blog
+   # 预期输出：镜像大小约50-60MB，标签为latest
+   
+   # 验证容器运行正常
+   docker run -d -p 8082:80 --name test-blog hugo-blog:latest
+   curl -s http://localhost:8082 | grep "我的Docker博客"
+   # 预期输出：包含博客标题的HTML内容
+   ```
+
+2. **功能完整性检查** ✅
+   - 首页显示博客标题和文章列表
+   - 点击文章链接可以访问详细页面
+   - 中文内容显示正常，无编码问题
+   - 页面响应式设计，移动端友好
+
+3. **性能指标达标** ✅
+   - 镜像大小控制在60MB以内
+   - 页面加载时间小于100ms（本地测试）
+   - Gzip压缩正常工作
+   - HTTP响应状态码200
+
+4. **代码质量要求** ✅
+   - Dockerfile采用多阶段构建最佳实践
+   - HTML模板结构清晰，SEO友好
+   - Nginx配置优化，支持静态文件服务
+   - 代码注释完整，便于维护
 
 ---
 
