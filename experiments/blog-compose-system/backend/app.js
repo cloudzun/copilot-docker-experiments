@@ -8,7 +8,13 @@ const port = 3000;
 
 // 中间件
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ charset: 'utf-8' }));
+
+// 设置默认字符集
+app.use((req, res, next) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
 
 // Redis客户端
 let redisClient;
@@ -35,6 +41,8 @@ const dbConfig = {
   user: process.env.DB_USER || 'bloguser',
   password: process.env.DB_PASSWORD || 'secret123',
   database: process.env.DB_NAME || 'blog',
+  charset: 'utf8mb4',
+  collation: 'utf8mb4_unicode_ci',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
