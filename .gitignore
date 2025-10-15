@@ -2,12 +2,10 @@
 .DS_Store
 Thumbs.db
 
-# 日志文件
-*.log
+# 日志文件（但允许temp目录下的日志文件）
 logs/
 
-# 临时文件
-temp/
+# 临时文件（保留temp目录，但排除其中的临时文件类型）
 tmp/
 *.tmp
 

@@ -22,7 +22,7 @@ NC='\033[0m' # No Color
 # 日志文件设置
 LOG_DATE=$(date +"%Y%m%d")
 LOG_TIME=$(date +"%Y-%m-%d %H:%M:%S")
-LOG_DIR="/root/copilot-docker-experiments/logs"
+LOG_DIR="/root/copilot-docker-experiments/temp"
 LOG_FILE="${LOG_DIR}/health_check_${LOG_DATE}.log"
 
 # 创建日志目录
