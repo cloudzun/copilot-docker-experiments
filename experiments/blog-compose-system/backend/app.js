@@ -106,7 +106,7 @@ app.get('/api/posts', async (req, res) => {
 
     // 从数据库获取
     const [rows] = await pool.execute(
-      'SELECT id, title, content, author, created_at FROM posts ORDER BY created_at DESC'
+      'SELECT id, title, content, created_at FROM posts ORDER BY created_at DESC'
     );
     
     // 缓存结果
@@ -125,15 +125,15 @@ app.get('/api/posts', async (req, res) => {
 // 创建新文章
 app.post('/api/posts', async (req, res) => {
   try {
-    const { title, content, author } = req.body;
+    const { title, content } = req.body;
     
-    if (!title || !content || !author) {
-      return res.status(400).json({ error: 'Title, content, and author are required' });
+    if (!title || !content) {
+      return res.status(400).json({ error: 'Title and content are required' });
     }
     
     const [result] = await pool.execute(
-      'INSERT INTO posts (title, content, author, created_at) VALUES (?, ?, ?, NOW())',
-      [title, content, author]
+      'INSERT INTO posts (title, content, created_at) VALUES (?, ?, NOW())',
+      [title, content]
     );
     
     // 清除缓存

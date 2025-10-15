@@ -593,7 +593,7 @@
         // 添加文章
         async function addPost(title, content) {
             try {
-                const response = await fetch('/posts', {
+                const response = await fetch('/api/posts', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
