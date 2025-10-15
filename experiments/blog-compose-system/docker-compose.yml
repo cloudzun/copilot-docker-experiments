@@ -1,0 +1,87 @@
+version: '3.3'
+
+services:
+  # 前端服务 - Nginx静态文件服务
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - blog-network
+
+  # 后端API服务 - Node.js简单API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - REDIS_HOST=cache
+      - NODE_ENV=production
+    depends_on:
+      - database
+      - cache
+    restart: unless-stopped
+    networks:
+      - blog-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 数据库服务
+  database:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=blog
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=secret123
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - blog-network
+    ports:
+      - "3306:3306"  # 暴露端口方便调试
+
+  # 缓存服务
+  cache:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - blog-network
+    ports:
+      - "6379:6379"  # 暴露端口方便调试
+
+  # 数据库管理工具 - 可选
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8081:8080"
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - blog-network
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  blog-network:
+    driver: bridge

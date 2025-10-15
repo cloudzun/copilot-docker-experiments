@@ -80,6 +80,19 @@ copilot-docker-experiments/
 1. 查看 `setup/` 目录了解系统配置过程
 2. 浏览 `docs/` 目录阅读实验文档
 3. 运行 `experiments/` 中的具体实验项目
+
+## 🧪 实验项目目录
+
+### 📱 experiments/blog-compose-system/
+**完整的多容器博客系统演示** - Docker Compose最佳实践案例
+
+- **架构**: 5服务容器编排 (Frontend + Backend + Database + Cache + Admin)
+- **特性**: 实时监控面板、健康检查、数据持久化、RESTful API
+- **技术栈**: Nginx + Node.js + MySQL + Redis + Adminer
+- **一键部署**: `cd experiments/blog-compose-system && ./deploy.sh`
+- **访问地址**: http://localhost (监控面板) + http://localhost:8080 (数据库管理)
+
+详细文档: [blog-compose-system/README.md](experiments/blog-compose-system/README.md)
 4. 使用 `scripts/` 中的工具脚本
 
 ## 🎯 实验目标与成果

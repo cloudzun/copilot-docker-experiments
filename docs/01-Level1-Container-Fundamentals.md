@@ -623,7 +623,7 @@ CMD ["nginx", "-g", "daemon off;"]
 EOF
 ```
 *关键说明*: 
-- **多阶段构建优势**: 最终镜像仅约53MB，比单阶段构建减少95%体积
+- **多阶段构建优势**: 最终镜像大小只需约53MB，比单阶段构建减少95%体积
 - **构建阶段修正**: 移除`hugo new site . --force`避免覆盖我们的配置文件
 - **--minify参数**: 压缩生成的HTML、CSS、JS文件，提升加载性能
 - **--gc参数**: 清理构建过程中的临时文件
@@ -789,7 +789,6 @@ EOF
 - **site.RegularPages**: 获取所有常规页面，排除index页面
 - **动态描述**: 从配置文件读取博客描述，便于统一管理
 
-**步骤5: 创建nginx配置**
 ```bash
 # 创建nginx配置文件
 cat > nginx.conf << 'EOF'
@@ -907,33 +906,6 @@ curl -s http://localhost:8082/posts/first-post/ | grep -E "(Docker|环境一致�
 - 文章页面应该包含完整的Markdown渲染内容
 - 中文内容显示正常，无乱码问题
 
-```bash
-# 清理测试容器
-docker stop my-blog && docker rm my-blog
-```
-*清理说明*: 及时清理测试容器，避免端口冲突和资源占用
-
-```bash
-# 检查容器是否成功清理
-docker ps -a | grep hugo-blog || echo "✅ 容器已成功清理"
-```
-
-**🔧 故障排除提示**:
-- **Hugo配置错误**: 检查config.yaml语法，确保缩进正确，使用空格而非制表符
-- **模板错误**: 验证Hugo模板语法，特别是{{ }}标记的正确性
-- **权限问题**: 确保所有文件具有正确的读取权限(644)，目录权限为755
-- **网络问题**: 检查防火墙设置，确保8082端口可访问
-- **构建缓存问题**: 使用`docker build --no-cache`清除缓存重新构建
-- **中文编码问题**: 确保所有文件使用UTF-8编码保存
-
-**📈 性能优化建议**:
-- **镜像层缓存**: 将不常变化的COPY指令放在前面，利用Docker层缓存
-- **Nginx优化**: 启用gzip压缩，设置适当的缓存头
-- **Hugo构建**: 使用--minify参数压缩输出，--gc清理临时文件
-- **多平台支持**: 使用`docker buildx`构建多架构镜像
-
-**🤖 AI辅助提示**: 让Copilot帮助优化Dockerfile并生成nginx配置
-
 ### 🎯 项目成功验收标准
 
 完成Hugo博客项目后，您应该能够：
@@ -967,6 +939,17 @@ docker ps -a | grep hugo-blog || echo "✅ 容器已成功清理"
    - HTML模板结构清晰，SEO友好
    - Nginx配置优化，支持静态文件服务
    - 代码注释完整，便于维护
+
+**验收完成后清理**
+```bash
+# 清理测试容器
+docker stop my-blog && docker rm my-blog
+```
+
+```bash
+# 检查容器是否成功清理
+docker ps -a | grep my-blog || echo "✅ 容器已成功清理"
+```
 
 ---
 
@@ -1034,17 +1017,19 @@ docker run -d --name app1 --network my-network nginx
 # 创建专用网络
 docker network create blog-network
 ```
-*说明*: 为博客应用创建独立的网络环境
+*说明*: 为博客应用创建独立的网络环境，容器间可通过服务名通信
 
 ```bash
 # 查看网络配置
 docker network ls
 ```
+*预期输出*: 显示所有网络，包括新建的blog-network
 
 ```bash
 # 查看网络详细信息
 docker network inspect blog-network
 ```
+*说明*: 显示网络的子网、网关、IPAM配置等详细信息
 
 **步骤2: 部署数据库容器**
 ```bash
@@ -1056,23 +1041,37 @@ docker run -d \
   -e MYSQL_DATABASE=blog \
   mysql:8.0
 ```
-*说明*: 数据库容器连接到自定义网络，通过容器名进行通信
+*关键参数说明*:
+- `--network blog-network`: 将容器连接到自定义网络
+- `-e MYSQL_ROOT_PASSWORD`: 设置MySQL root用户密码
+- `-e MYSQL_DATABASE`: 创建初始数据库
 
 ```bash
 # 查看数据库启动状态
 docker logs blog-db
 ```
+*说明*: 等待看到"ready for connections"表示MySQL启动完成
 
 **步骤3: 测试网络连通性**
 ```bash
 # 创建测试容器连接到同一网络
 docker run -it --network blog-network --rm alpine sh
 ```
+*说明*: `--rm` 参数确保测试容器退出后自动删除
+
 *在容器内执行*:
 ```bash
 # 测试数据库连接（容器内执行）
 ping blog-db
 ```
+*预期结果*: 能够ping通blog-db容器，说明网络连通正常
+
+```bash
+# 安装网络工具并测试端口（容器内执行）
+apk add --no-cache curl
+curl -v telnet://blog-db:3306
+```
+*说明*: 测试MySQL端口3306是否可访问
 
 ```bash
 # 退出测试容器（容器内执行）
@@ -1091,120 +1090,42 @@ docker run -d \
   -e DB_PASSWORD=secret123 \
   nginx:alpine
 ```
-*说明*: 应用通过环境变量配置数据库连接
+*关键配置说明*:
+- `DB_HOST=blog-db`: 使用容器名作为主机名，Docker会自动解析为容器IP
+- 环境变量传递数据库连接信息，应用程序可以直接使用
+- `-p 3000:3000`: 暴露应用端口到宿主机
 
-#### 3.5 数据卷管理
-
-**步骤1: 创建和管理数据卷**
+**步骤5: 验证容器间通信**
 ```bash
-# 创建命名卷
-docker volume create blog-data
+# 查看网络中的所有容器
+docker network inspect blog-network | grep -A 5 "Containers"
+```
+*说明*: 显示网络中连接的容器及其IP地址
+
+```bash
+# 测试应用容器到数据库的连接
+docker exec blog-app ping blog-db
+```
+*预期结果*: 应用容器能够ping通数据库容器
+
+```bash
+# 查看所有容器状态
+docker ps
+```
+*验证*: blog-db和blog-app容器都应该处于运行状态
+
+**步骤6: 清理实验环境**
+```bash
+# 一键清理所有实验资源
+docker stop blog-app blog-db && docker rm blog-app blog-db && docker network rm blog-network
 ```
 
 ```bash
-# 查看卷列表
-docker volume ls
+# 验证清理结果
+docker ps -a | grep blog || echo "✅ 容器已清理完成"
+docker network ls | grep blog || echo "✅ 网络已清理完成"
 ```
-
-```bash
-# 查看卷详细信息
-docker volume inspect blog-data
-```
-
-**步骤2: 使用数据卷持久化数据**
-```bash
-# 停止之前的数据库容器
-docker stop blog-db && docker rm blog-db
-```
-
-```bash
-# 重新创建带数据卷的数据库
-docker run -d \
-  --name blog-db \
-  --network blog-network \
-  -v blog-data:/var/lib/mysql \
-  -e MYSQL_ROOT_PASSWORD=secret123 \
-  -e MYSQL_DATABASE=blog \
-  mysql:8.0
-```
-*说明*: 数据现在存储在持久化卷中，容器删除后数据仍然保留
-
-**步骤3: 数据备份和恢复**
-```bash
-# 创建备份目录
-mkdir -p ~/backups
-```
-
-```bash
-# 备份数据卷
-docker run --rm \
-  -v blog-data:/data \
-  -v ~/backups:/backup \
-  alpine tar czf /backup/blog-backup-$(date +%Y%m%d).tar.gz -C /data .
-```
-*说明*: 使用临时容器将数据卷内容打包备份
-
-```bash
-# 验证备份文件
-ls -la ~/backups/
-```
-
-**步骤4: 绑定挂载示例**
-```bash
-# 创建本地配置目录
-mkdir -p ~/blog-config
-```
-
-```bash
-# 创建配置文件
-echo "server_id=1" > ~/blog-config/my.cnf
-```
-
-```bash
-# 使用绑定挂载
-docker run -d \
-  --name blog-db-custom \
-  --network blog-network \
-  -v blog-data:/var/lib/mysql \
-  -v ~/blog-config:/etc/mysql/conf.d:ro \
-  -e MYSQL_ROOT_PASSWORD=secret123 \
-  mysql:8.0
-```
-*说明*: `:ro` 表示只读挂载，配置文件从宿主机加载
-
-### 🎪 动手项目: 带数据库的动态博客
-
-**项目目标**: 构建包含前端、后端、数据库的完整应用
-
-```bash
-# 网络和数据卷准备
-docker network create blog-network
-docker volume create mysql-data
-docker volume create redis-data
-
-# 数据库层
-docker run -d \
-  --name blog-mysql \
-  --network blog-network \
-  -v mysql-data:/var/lib/mysql \
-  -e MYSQL_ROOT_PASSWORD=rootpass \
-  -e MYSQL_DATABASE=blog \
-  -e MYSQL_USER=bloguser \
-  -e MYSQL_PASSWORD=blogpass \
-  mysql:8.0
-
-# 缓存层
-docker run -d \
-  --name blog-redis \
-  --network blog-network \
-  -v redis-data:/data \
-  redis:7-alpine
-
-# 应用验证
-docker exec blog-mysql mysql -u root -prootpass -e "SHOW DATABASES;"
-```
-
-**🤖 AI辅助提示**: 使用Copilot生成数据库初始化脚本和连接测试代码
+*说明*: 良好的实验习惯是及时清理资源，避免积累过多测试容器
 
 ---
 
@@ -1258,98 +1179,56 @@ environment:
 
 ### 🛠️ 实践操作 (5小时)
 
-#### 4.3 编写第一个Compose文件
-```yaml
-# docker-compose.yml
-version: '3.8'
+#### 4.3 构建完整的多容器博客系统
+
+**项目目标**: 创建一个真实可用的博客系统，让你亲身体验多容器应用的协作
+
+**📋 系统架构预览**:
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   前端服务      │    │   后端API服务    │    │   数据库服务    │
+│   (Nginx)       │◄──►│   (Node.js)     │◄──►│   (MySQL)       │
+│   端口: 8080    │    │   内部端口: 3000  │    │   端口: 3306    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                        │                        │
+         └────────────────────────┼────────────────────────┘
+                                  │
+                    ┌─────────────────┐    ┌─────────────────┐
+                    │   缓存服务      │    │   管理工具      │
+                    │   (Redis)       │    │   (Adminer)     │
+                    │   端口: 6379    │    │   端口: 8081    │
+                    └─────────────────┘    └─────────────────┘
+```
+
+**步骤1: 创建项目目录结构**
+```bash
+# 创建项目根目录
+mkdir blog-compose-demo && cd blog-compose-demo
+```
+
+**步骤2: 创建Docker Compose配置文件**
+```bash
+# 创建主配置文件
+cat > docker-compose.yml << 'EOF'
+version: '3.3'
 
 services:
+  # 前端服务 - Nginx静态文件服务
   frontend:
-    build: ./frontend
+    image: nginx:alpine
     ports:
       - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf
     depends_on:
       - backend
-    networks:
-      - app-network
-
-  backend:
-    build: ./backend
-    environment:
-      - DB_HOST=database
-      - REDIS_HOST=cache
-    depends_on:
-      - database
-      - cache
-    networks:
-      - app-network
-
-  database:
-    image: mysql:8.0
-    environment:
-      - MYSQL_ROOT_PASSWORD=${DB_PASSWORD}
-      - MYSQL_DATABASE=blog
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - app-network
-
-  cache:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
-    networks:
-      - app-network
-
-volumes:
-  mysql_data:
-  redis_data:
-
-networks:
-  app-network:
-    driver: bridge
-```
-
-#### 4.4 Compose命令操作
-```bash
-# 启动所有服务
-docker-compose up -d
-
-# 查看服务状态
-docker-compose ps
-
-# 查看服务日志
-docker-compose logs -f backend
-
-# 重启特定服务
-docker-compose restart frontend
-
-# 清理环境
-docker-compose down -v
-```
-
-### 🎪 动手项目: 个人博客系统 v1.0
-
-**项目目标**: 使用Compose编排完整的博客系统
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  # 前端服务
-  web:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "80:80"
-    depends_on:
-      - api
     restart: unless-stopped
+    networks:
+      - blog-network
 
-  # 后端API服务
-  api:
+  # 后端API服务 - Node.js简单API
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -1357,25 +1236,37 @@ services:
       - DB_HOST=database
       - DB_NAME=blog
       - DB_USER=bloguser
-      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PASSWORD=secret123
       - REDIS_HOST=cache
+      - NODE_ENV=production
     depends_on:
       - database
       - cache
     restart: unless-stopped
+    networks:
+      - blog-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # 数据库服务
   database:
     image: mysql:8.0
     environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=rootpassword
       - MYSQL_DATABASE=blog
       - MYSQL_USER=bloguser
-      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_PASSWORD=secret123
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./init-scripts:/docker-entrypoint-initdb.d
+      - ./init-db:/docker-entrypoint-initdb.d
     restart: unless-stopped
+    networks:
+      - blog-network
+    ports:
+      - "3306:3306"  # 暴露端口方便调试
 
   # 缓存服务
   cache:
@@ -1383,13 +1274,704 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
+    networks:
+      - blog-network
+    ports:
+      - "6379:6379"  # 暴露端口方便调试
+
+  # 数据库管理工具 - 可选
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8081:8080"
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - blog-network
 
 volumes:
   mysql_data:
   redis_data:
+
+networks:
+  blog-network:
+    driver: bridge
+EOF
 ```
 
-**🤖 AI辅助提示**: 让Copilot生成.env模板和服务健康检查配置
+**步骤3: 创建后端服务代码**
+```bash
+# 创建后端目录
+mkdir backend
+
+# 创建Node.js应用
+cat > backend/package.json << 'EOF'
+{
+  "name": "blog-backend",
+  "version": "1.0.0",
+  "description": "Blog system backend API",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.0",
+    "redis": "^4.6.7",
+    "cors": "^2.8.5"
+  }
+}
+EOF
+
+# 创建后端API代码
+cat > backend/app.js << 'EOF'
+const express = require('express');
+const mysql = require('mysql2/promise');
+const redis = require('redis');
+const cors = require('cors');
+
+const app = express();
+const port = 3000;
+
+// 中间件
+app.use(cors());
+app.use(express.json());
+
+// Redis客户端
+let redisClient;
+(async () => {
+  try {
+    redisClient = redis.createClient({
+      socket: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: 6379
+      }
+    });
+    
+    redisClient.on('error', (err) => console.log('Redis Client Error', err));
+    await redisClient.connect();
+    console.log('✅ Redis connected successfully');
+  } catch (error) {
+    console.log('❌ Redis connection failed:', error.message);
+  }
+})();
+
+// MySQL连接池
+const dbConfig = {
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'bloguser',
+  password: process.env.DB_PASSWORD || 'secret123',
+  database: process.env.DB_NAME || 'blog',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+};
+
+let pool;
+
+(async () => {
+  try {
+    pool = mysql.createPool(dbConfig);
+    const connection = await pool.getConnection();
+    console.log('✅ Database connected successfully');
+    connection.release();
+  } catch (error) {
+    console.log('❌ Database connection failed:', error.message);
+  }
+})();
+
+// 健康检查端点
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    services: {
+      database: pool ? 'connected' : 'disconnected',
+      redis: redisClient?.isOpen ? 'connected' : 'disconnected'
+    }
+  });
+});
+
+// 获取所有文章
+app.get('/api/posts', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, title, content, author, created_at FROM posts ORDER BY created_at DESC'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    res.status(500).json({ error: 'Failed to fetch posts' });
+  }
+});
+
+// 创建新文章
+app.post('/api/posts', async (req, res) => {
+  try {
+    const { title, content, author } = req.body;
+    
+    if (!title || !content || !author) {
+      return res.status(400).json({ error: 'Title, content, and author are required' });
+    }
+    
+    const [result] = await pool.execute(
+      'INSERT INTO posts (title, content, author, created_at) VALUES (?, ?, ?, NOW())',
+      [title, content, author]
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Post created successfully' 
+    });
+  } catch (error) {
+    console.error('Error creating post:', error);
+    res.status(500).json({ error: 'Failed to create post' });
+  }
+});
+
+// 获取系统统计信息
+app.get('/api/stats', async (req, res) => {
+  try {
+    const [postCount] = await pool.execute('SELECT COUNT(*) as count FROM posts');
+    
+    res.json({
+      totalPosts: postCount[0].count,
+      cacheStatus: redisClient?.isOpen ? 'connected' : 'disconnected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// 启动服务器
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 Blog API server running on port ${port}`);
+});
+EOF
+
+# 创建Dockerfile
+cat > backend/Dockerfile << 'EOF'
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 复制package文件并安装依赖
+COPY package*.json ./
+RUN npm install --production
+
+# 安装curl用于健康检查
+RUN apk add --no-cache curl
+
+# 复制应用代码
+COPY . .
+
+# 创建非root用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# 更改文件权限
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+EXPOSE 3000
+
+CMD ["npm", "start"]
+EOF
+```
+
+**步骤4: 创建前端界面**
+```bash
+# 创建前端目录
+mkdir frontend
+
+# 创建响应式博客界面（这里只显示关键部分，完整代码较长）
+cat > frontend/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人博客系统 - Docker Compose演示</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f4f4f4; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                 color: white; text-align: center; padding: 2rem; margin-bottom: 2rem; 
+                 border-radius: 10px; }
+        .status-panel { background: white; padding: 1.5rem; border-radius: 8px; 
+                        margin-bottom: 2rem; }
+        .posts-section { background: white; padding: 1.5rem; border-radius: 8px; }
+        .post { border: 1px solid #eee; padding: 1.5rem; margin-bottom: 1rem; 
+                border-radius: 8px; background: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 个人博客系统</h1>
+            <p>Docker Compose 多容器应用演示</p>
+        </header>
+
+        <div class="status-panel">
+            <h2>📊 系统状态</h2>
+            <div id="backend-status">检查中...</div>
+            <div id="database-status">检查中...</div>
+            <div id="cache-status">检查中...</div>
+            <div id="post-count">统计中...</div>
+        </div>
+
+        <div class="posts-section">
+            <h2>📝 发布新文章</h2>
+            <form id="post-form">
+                <input type="text" id="title" placeholder="文章标题" required><br>
+                <input type="text" id="author" placeholder="作者姓名" required><br>
+                <textarea id="content" placeholder="文章内容" required></textarea><br>
+                <button type="submit">发布文章</button>
+            </form>
+
+            <h2>📚 最新文章</h2>
+            <div id="posts-container">正在加载文章...</div>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript代码处理API交互
+        async function loadPosts() {
+            const response = await fetch('/api/posts');
+            const posts = await response.json();
+            // 渲染文章列表
+        }
+        
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', loadPosts);
+    </script>
+</body>
+</html>
+EOF
+```
+
+**步骤5: 创建Nginx配置**
+```bash
+# 创建Nginx配置文件
+cat > nginx.conf << 'EOF'
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream backend {
+        server backend:3000;
+    }
+    
+    server {
+        listen 80;
+        server_name localhost;
+        
+        # 静态文件服务
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+        
+        # API代理到后端
+        location /api/ {
+            proxy_pass http://backend/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        
+        # 健康检查
+        location /health {
+            proxy_pass http://backend/health;
+        }
+    }
+}
+EOF
+```
+
+**步骤6: 创建数据库初始化脚本**
+```bash
+# 创建数据库初始化目录
+mkdir init-db
+
+# 创建数据库表和示例数据
+cat > init-db/01-init.sql << 'EOF'
+USE blog;
+
+CREATE TABLE IF NOT EXISTS posts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    author VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO posts (title, content, author) VALUES 
+('欢迎来到Docker Compose博客系统', 
+'这是一个完整的多容器博客应用演示。系统包含前端、后端、数据库和缓存服务。', 
+'系统管理员'),
+('Docker Compose的优势', 
+'Docker Compose让多容器应用管理变得简单。一键启动所有服务，自动配置网络。', 
+'Docker专家');
+EOF
+```
+
+**步骤7: 启动系统并验证**
+```bash
+# 启动所有服务
+docker-compose up -d
+```
+
+```bash
+# 查看服务状态
+docker-compose ps
+```
+*预期输出*: 所有服务都应该显示为"Up"状态
+
+```bash
+# 验证系统健康状态
+curl http://localhost:8080/health
+```
+*预期输出*: 
+```json
+{
+  "status": "healthy",
+  "services": {
+    "database": "connected",
+    "redis": "connected"
+  }
+}
+```
+
+**步骤8: 用户观测和交互验证**
+
+**🌐 Web界面访问验证**:
+1. **打开博客主页**: http://localhost:8080
+   - 查看响应式界面设计
+   - 观察系统状态面板（应显示所有服务正常）
+   - 查看预加载的示例文章
+
+2. **测试发布文章功能**:
+   - 在Web界面填写新文章表单
+   - 点击"发布文章"按钮
+   - 观察文章是否立即出现在列表中
+
+3. **数据库管理界面**: http://localhost:8081
+   - 使用Adminer连接数据库
+   - 服务器: `database`
+   - 用户名: `bloguser`
+   - 密码: `secret123`
+   - 数据库: `blog`
+
+**🔧 API接口测试验证**:
+```bash
+# 获取文章列表
+curl http://localhost:8080/api/posts
+
+# 发布新文章
+curl -X POST http://localhost:8080/api/posts \
+  -H "Content-Type: application/json" \
+  -d '{"title":"API测试文章","content":"通过curl命令发布","author":"测试用户"}'
+
+# 查看系统统计
+curl http://localhost:8080/api/stats
+```
+
+**🎯 完整版本体验**
+
+如果你想体验更完整、功能更丰富的博客系统，请使用我们准备的完整版本：
+
+```bash
+# 进入完整版目录
+cd /root/copilot-docker-experiments/experiments/blog-compose-system/
+
+# 使用一键部署脚本
+./deploy.sh
+
+# 或者手动部署
+docker-compose up -d
+```
+
+**完整版特性**:
+- ✅ **实时服务监控**: 可视化监控面板，实时显示所有5个服务状态
+- ✅ **自动健康检查**: 每30秒自动检查服务健康状态，支持手动刷新
+- ✅ **完善的错误处理**: 连接失败、超时等异常情况的友好提示
+- ✅ **生产级配置**: 包含安全头、性能优化、日志管理
+- ✅ **丰富的示例数据**: 预置多篇技术文章，展示真实使用场景
+- ✅ **详细的部署文档**: 包含故障排除、扩展功能等指导
+
+**完整版访问地址**:
+- 主页监控面板: http://localhost
+- 数据库管理: http://localhost:8080
+- 详细文档: 查看 `experiments/blog-compose-system/README.md`
+
+---
+
+**📋 用户观测清单**
+
+作为用户，你应该能够观察到以下现象：
+
+**1. 容器编排效果**
+```bash
+# 查看所有容器状态
+docker-compose ps
+```
+*观测点*: 5个服务全部启动成功，状态为Up
+
+**2. 服务间通信**
+- 前端能通过服务名访问后端API
+- 后端能连接MySQL数据库
+- 后端能连接Redis缓存
+- 所有服务在同一个Docker网络中
+
+**3. 数据持久化**
+```bash
+# 停止服务
+docker-compose down
+
+# 重新启动
+docker-compose up -d
+
+# 验证数据是否保持
+curl http://localhost/posts
+```
+*观测点*: 数据库中的文章数据依然存在
+
+**4. 负载均衡和扩展**
+```bash
+# 扩展后端服务到3个实例
+docker-compose up -d --scale backend=3
+
+# 查看扩展效果
+docker-compose ps backend
+```
+*观测点*: 多个后端实例均匀处理请求
+
+**5. 日志聚合查看**
+```bash
+# 查看所有服务日志
+docker-compose logs -f
+
+# 查看特定服务日志
+docker-compose logs -f backend
+```
+*观测点*: 可以统一查看所有服务的运行日志
+curl http://localhost:8080/api/stats
+```
+
+**📊 多容器协作观测**:
+```bash
+# 查看所有容器日志
+docker-compose logs -f
+
+# 查看特定服务日志
+docker-compose logs backend
+docker-compose logs database
+
+# 查看容器资源使用
+docker stats
+```
+
+**🔍 网络连通性验证**:
+```bash
+# 进入后端容器测试内部网络
+docker-compose exec backend sh
+
+# 在容器内测试（容器内执行）
+ping database  # 应该能ping通
+ping cache     # 应该能ping通
+curl http://cache:6379  # 测试Redis连接
+```
+
+**步骤9: 清理和重新启动测试**
+```bash
+# 停止所有服务
+docker-compose down
+
+# 查看数据持久化（数据卷应该保留）
+docker volume ls | grep blog-compose-demo
+
+# 重新启动验证数据持久化
+docker-compose up -d
+
+# 验证之前发布的文章仍然存在
+curl http://localhost:8080/api/posts
+```
+
+#### 4.4 Compose命令操作与系统监控
+
+**基础操作命令**:
+```bash
+# 启动所有服务（后台模式）
+docker-compose up -d
+
+# 查看服务状态和端口映射
+docker-compose ps
+
+# 查看服务日志（实时跟踪）
+docker-compose logs -f
+
+# 查看特定服务日志
+docker-compose logs -f backend
+docker-compose logs -f database
+
+# 重启特定服务
+docker-compose restart backend
+
+# 停止所有服务
+docker-compose down
+
+# 停止并删除数据卷（注意：会丢失数据）
+docker-compose down -v
+```
+
+**🔍 系统监控和观测技巧**:
+
+**1. 实时性能监控**
+```bash
+# 查看所有容器CPU和内存使用情况
+docker stats
+
+# 查看特定容器资源使用
+docker stats blog-compose-demo_backend_1
+```
+*观测要点*: 
+- CPU使用率应该在启动后稳定在较低水平
+- 内存使用：MySQL约400MB，Node.js约50MB，Redis约10MB
+- 网络IO反映实际用户访问量
+
+**2. 服务健康状态检查**
+```bash
+# 检查所有容器健康状态
+docker-compose ps
+
+# 详细检查单个服务健康状态
+docker inspect blog-compose-demo_backend_1 | grep -A 20 "Health"
+```
+*健康状态说明*:
+- `healthy`: 服务正常运行
+- `unhealthy`: 服务异常，需要检查日志
+- `starting`: 正在启动中，等待健康检查通过
+
+**3. 网络连通性测试**
+```bash
+# 查看Docker网络配置
+docker network ls
+
+# 检查自定义网络详情
+docker network inspect blog-compose-demo_blog-network
+
+# 容器间网络测试
+docker-compose exec backend ping database
+docker-compose exec backend ping cache
+```
+
+**4. 数据持久化验证**
+```bash
+# 查看数据卷使用情况
+docker volume ls | grep blog-compose-demo
+
+# 检查数据卷详细信息
+docker volume inspect blog-compose-demo_mysql_data
+
+# 模拟数据持久化测试
+docker-compose down
+docker-compose up -d
+curl http://localhost:8080/api/posts  # 数据应该仍然存在
+```
+
+**🚨 故障排除指南**:
+
+**问题1: 容器无法启动**
+```bash
+# 查看容器启动错误
+docker-compose logs [service-name]
+
+# 检查端口冲突
+netstat -tlnp | grep :8080
+lsof -i :8080
+```
+
+**问题2: 服务间无法通信**
+```bash
+# 检查网络配置
+docker-compose exec backend nslookup database
+docker-compose exec backend ping database
+
+# 检查防火墙设置
+sudo ufw status
+```
+
+**问题3: 数据库连接失败**
+```bash
+# 进入数据库容器检查
+docker-compose exec database mysql -u bloguser -p blog
+
+# 查看MySQL进程和端口
+docker-compose exec database ps aux | grep mysql
+docker-compose exec database netstat -tlnp | grep 3306
+```
+
+**🎯 用户体验验证清单**:
+
+**Web界面功能测试**:
+- [ ] 博客首页正常加载 (http://localhost:8080)
+- [ ] 系统状态面板显示所有服务正常
+- [ ] 能够发布新文章并立即显示
+- [ ] 文章列表正确显示时间和作者
+- [ ] 响应式设计在移动端正常工作
+
+**API接口功能测试**:
+- [ ] 健康检查接口返回正常 (GET /health)
+- [ ] 获取文章列表成功 (GET /api/posts)
+- [ ] 发布文章接口工作正常 (POST /api/posts)
+- [ ] 统计信息接口返回正确数据 (GET /api/stats)
+
+**数据管理验证**:
+- [ ] Adminer界面能够连接数据库 (http://localhost:8081)
+- [ ] 数据库表结构正确创建
+- [ ] 示例数据成功插入
+- [ ] 新发布的文章保存到数据库
+
+**性能和稳定性**:
+- [ ] 页面加载时间小于2秒
+- [ ] API响应时间小于100ms
+- [ ] 容器重启后数据完整保留
+- [ ] 系统能够处理并发访问
+
+**📈 扩展实验建议**:
+
+**1. 负载测试**
+```bash
+# 使用ab工具进行简单负载测试
+ab -n 100 -c 10 http://localhost:8080/
+
+# 测试API接口性能
+ab -n 50 -c 5 http://localhost:8080/api/posts
+```
+
+**2. 扩展实验**
+```bash
+# 尝试扩展后端服务到多个实例
+docker-compose up -d --scale backend=3
+
+# 查看负载均衡效果
+docker-compose ps
+```
+
+**3. 日志分析**
+```bash
+# 实时监控所有服务日志
+docker-compose logs -f --tail=100
+
+# 分析错误日志
+docker-compose logs | grep -i error
+docker-compose logs | grep -i warning
+```
 
 ---
 
