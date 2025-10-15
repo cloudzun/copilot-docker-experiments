@@ -90,7 +90,7 @@ copilot-docker-experiments/
 - **特性**: 实时监控面板、健康检查、数据持久化、RESTful API
 - **技术栈**: Nginx + Node.js + MySQL + Redis + Adminer
 - **一键部署**: `cd experiments/blog-compose-system && ./deploy.sh`
-- **访问地址**: http://localhost (监控面板) + http://localhost:8080 (数据库管理)
+- **访问地址**: http://localhost:8085 (监控面板) + http://localhost:8082 (数据库管理)
 
 详细文档: [blog-compose-system/README.md](experiments/blog-compose-system/README.md)
 4. 使用 `scripts/` 中的工具脚本

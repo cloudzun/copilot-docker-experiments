@@ -27,7 +27,7 @@ echo "✅ Docker 环境检查通过"
 # 检查端口占用
 echo "📋 检查端口占用..."
 
-PORTS=(80 3000 3306 6379 8080)
+PORTS=(8085 3000 3307 6381 8082)
 OCCUPIED_PORTS=()
 
 for port in "${PORTS[@]}"; do
@@ -70,7 +70,7 @@ MAX_RETRIES=30
 RETRY_COUNT=0
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if curl -s -f http://localhost/health > /dev/null 2>&1; then
+    if curl -s -f http://localhost:8085/health > /dev/null 2>&1; then
         echo "✅ 服务健康检查通过!"
         break
     fi
@@ -90,8 +90,8 @@ fi
 echo ""
 echo "🎉 博客系统部署成功!"
 echo "======================================"
-echo "📱 前端监控面板: http://localhost"
-echo "🛠️  数据库管理:   http://localhost:8080"
+echo "📱 前端监控面板: http://localhost:8085"
+echo "🛠️  数据库管理:   http://localhost:8082"
 echo "   - 用户名: root"
 echo "   - 密码: rootpassword"
 echo "   - 数据库: blog_system"
@@ -108,13 +108,13 @@ if command -v xdg-open &> /dev/null; then
     read -p "是否打开浏览器访问系统? (Y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        xdg-open http://localhost
+        xdg-open http://localhost:8085
     fi
 elif command -v open &> /dev/null; then
     read -p "是否打开浏览器访问系统? (Y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        open http://localhost
+        open http://localhost:8085
     fi
 fi
 

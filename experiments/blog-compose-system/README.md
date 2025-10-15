@@ -42,21 +42,21 @@ docker-compose ps
 
 ### 验证部署
 
-1. **前端界面**: http://localhost
+1. **前端界面**: http://localhost:8085
    - 实时服务状态监控
    - 文章管理功能
    - 响应式设计
 
-2. **数据库管理**: http://localhost:8080
+2. **数据库管理**: http://localhost:8082
    - 用户名：`root`
    - 密码：`rootpassword`
    - 数据库：`blog_system`
 
 3. **健康检查**:
    ```bash
-   curl http://localhost/health
-   curl http://localhost/health/db
-   curl http://localhost/health/cache
+   curl http://localhost:8085/health
+   curl http://localhost:8085/health/db
+   curl http://localhost:8085/health/cache
    ```
 
 ## 📁 项目结构
@@ -155,7 +155,7 @@ docker stats
 ```
 
 ### 4. 数据库管理
-- 访问 http://localhost:8080
+- 访问 http://localhost:8082
 - 使用 Adminer 可视化管理数据库
 - 查看表结构、执行 SQL 查询
 - 监控数据库性能指标

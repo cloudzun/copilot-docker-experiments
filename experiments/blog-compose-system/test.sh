@@ -33,21 +33,21 @@ echo ""
 echo "🔍 执行健康检查..."
 
 # 检查前端
-if curl -s -f http://localhost > /dev/null; then
+if curl -s -f http://localhost:8085 > /dev/null; then
     echo "✅ 前端服务: 正常"
 else
     echo "❌ 前端服务: 异常"
 fi
 
 # 检查健康端点
-if curl -s -f http://localhost/health > /dev/null; then
+if curl -s -f http://localhost:8085/health > /dev/null; then
     echo "✅ 健康检查: 正常"
 else
     echo "❌ 健康检查: 异常"
 fi
 
 # 检查API
-if curl -s -f http://localhost/posts > /dev/null; then
+if curl -s -f http://localhost:8085/posts > /dev/null; then
     echo "✅ API服务: 正常"
 else
     echo "❌ API服务: 异常"
@@ -56,7 +56,7 @@ fi
 echo ""
 echo "🎯 验证完成！"
 echo "访问地址:"
-echo "- 主页: http://localhost"
-echo "- 管理: http://localhost:8080"
+echo "- 主页: http://localhost:8085"
+echo "- 管理: http://localhost:8082"
 echo ""
 echo "停止服务: docker-compose down"

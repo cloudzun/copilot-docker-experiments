@@ -42,24 +42,51 @@ const dbConfig = {
 
 let pool;
 
-(async () => {
-  try {
-    pool = mysql.createPool(dbConfig);
-    const connection = await pool.getConnection();
-    console.log('✅ Database connected successfully');
-    connection.release();
-  } catch (error) {
-    console.log('❌ Database connection failed:', error.message);
+// 初始化数据库连接（带重试）
+async function initDatabase() {
+  const maxRetries = 10;
+  const retryDelay = 3000; // 3秒
+  
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      pool = mysql.createPool(dbConfig);
+      const connection = await pool.getConnection();
+      console.log('✅ Database connected successfully');
+      connection.release();
+      return;
+    } catch (error) {
+      console.log(`❌ Database connection failed (attempt ${i + 1}/${maxRetries}): ${error.message}`);
+      if (i < maxRetries - 1) {
+        console.log(`⏳ Retrying in ${retryDelay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
   }
-})();
+  console.log('❌ Failed to connect to database after all retries');
+}
+
+initDatabase();
 
 // 健康检查端点
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  let dbStatus = 'disconnected';
+  
+  // 检查数据库连接
+  if (pool) {
+    try {
+      const connection = await pool.getConnection();
+      connection.release();
+      dbStatus = 'connected';
+    } catch (error) {
+      dbStatus = 'error';
+    }
+  }
+  
   res.json({ 
     status: 'healthy', 
     timestamp: new Date().toISOString(),
     services: {
-      database: pool ? 'connected' : 'disconnected',
+      database: dbStatus,
       redis: redisClient?.isOpen ? 'connected' : 'disconnected'
     }
   });
