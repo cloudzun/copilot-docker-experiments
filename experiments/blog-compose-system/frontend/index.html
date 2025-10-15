@@ -410,34 +410,39 @@
             {
                 name: 'Frontend (Nginx)',
                 endpoint: '/health',
-                description: '前端服务器 - 提供Web界面'
+                description: '前端服务器 - 提供Web界面',
+                statusKey: 'frontend' // 用于从health响应中解析状态
             },
             {
                 name: 'Backend (Node.js)',
                 endpoint: '/health',
-                description: 'API服务器 - 处理业务逻辑'
+                description: 'API服务器 - 处理业务逻辑',
+                statusKey: 'backend'
             },
             {
                 name: 'Database (MySQL)',
-                endpoint: '/health/db',
-                description: '数据库 - 存储文章数据'
+                endpoint: '/health',
+                description: '数据库 - 存储文章数据',
+                statusKey: 'database'
             },
             {
                 name: 'Cache (Redis)',
-                endpoint: '/health/cache',
-                description: '缓存服务 - 提升性能'
+                endpoint: '/health',
+                description: '缓存服务 - 提升性能',
+                statusKey: 'redis'
             },
             {
                 name: 'Admin (Adminer)',
-                endpoint: '/health/admin',
-                description: '数据库管理 - 可视化管理'
+                endpoint: '/health',
+                description: '数据库管理 - 可视化管理',
+                statusKey: 'admin'
             }
         ];
 
         // 检查单个服务状态
         async function checkServiceStatus(service) {
             try {
-                const response = await fetch(service.endpoint, {
+                const response = await fetch('/health', {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -447,11 +452,43 @@
                 
                 if (response.ok) {
                     const data = await response.json();
-                    return {
-                        status: 'healthy',
-                        message: '服务正常',
-                        details: data
-                    };
+                    
+                    // 根据服务类型返回相应状态
+                    if (service.statusKey === 'frontend') {
+                        return {
+                            status: 'healthy',
+                            message: '服务正常',
+                            details: { status: 'Frontend accessible' }
+                        };
+                    } else if (service.statusKey === 'backend') {
+                        return {
+                            status: data.status === 'healthy' ? 'healthy' : 'unhealthy',
+                            message: data.status === 'healthy' ? '服务正常' : '服务异常',
+                            details: data
+                        };
+                    } else if (service.statusKey === 'database') {
+                        const dbStatus = data.services?.database === 'connected';
+                        return {
+                            status: dbStatus ? 'healthy' : 'unhealthy',
+                            message: dbStatus ? '已连接' : '连接失败',
+                            details: { database: data.services?.database }
+                        };
+                    } else if (service.statusKey === 'redis') {
+                        const redisStatus = data.services?.redis === 'connected';
+                        return {
+                            status: redisStatus ? 'healthy' : 'unhealthy',
+                            message: redisStatus ? '已连接' : '连接失败',
+                            details: { redis: data.services?.redis }
+                        };
+                    } else if (service.statusKey === 'admin') {
+                        // Adminer状态基于数据库连接状态
+                        const dbStatus = data.services?.database === 'connected';
+                        return {
+                            status: dbStatus ? 'healthy' : 'unhealthy',
+                            message: dbStatus ? '可访问' : '不可用',
+                            details: { admin: 'Available via port 8082' }
+                        };
+                    }
                 } else {
                     return {
                         status: 'unhealthy',
