@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微服务博客系统 - Module 5 实践</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            padding: 30px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            border-left: 5px solid #ddd;
+            transition: all 0.3s ease;
+        }
+
+        .status-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .status-card.healthy {
+            border-left-color: #4CAF50;
+        }
+
+        .status-card.unhealthy {
+            border-left-color: #f44336;
+        }
+
+        .status-card.loading {
+            border-left-color: #ff9800;
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .status-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 50%;
+        }
+
+        .status-icon.healthy {
+            background-color: #4CAF50;
+            position: relative;
+        }
+
+        .status-icon.healthy::after {
+            content: '✓';
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-icon.unhealthy {
+            background-color: #f44336;
+            position: relative;
+        }
+
+        .status-icon.unhealthy::after {
+            content: '✗';
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-icon.loading {
+            background-color: #ff9800;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .service-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .service-status {
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .service-details {
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .blog-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .blog-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .blog-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #4e54c8 0%, #8f94fb 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(78, 84, 200, 0.3);
+        }
+
+        .add-post-form {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #4e54c8;
+        }
+
+        .submit-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+        }
+
+        .posts-list {
+            display: grid;
+            gap: 20px;
+        }
+
+        .post-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4e54c8;
+        }
+
+        .post-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .post-content {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .post-date {
+            font-size: 0.9em;
+            color: #999;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #f44336;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        .auto-refresh {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4e54c8;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐳 Docker Compose 博客系统</h1>
+            <p>多容器架构实时监控与管理面板</p>
+        </div>
+
+        <div class="dashboard">
+            <!-- 自动刷新控制 -->
+            <div class="auto-refresh">
+                <label class="switch">
+                    <input type="checkbox" id="autoRefresh" checked>
+                    <span class="slider"></span>
+                </label>
+                <span>自动刷新 (30秒)</span>
+                <button class="refresh-btn" onclick="checkAllServices()">立即刷新</button>
+            </div>
+
+            <!-- 服务状态网格 -->
+            <div class="status-grid" id="statusGrid">
+                <!-- 服务状态卡片将通过JavaScript动态生成 -->
+            </div>
+
+            <!-- 博客功能区域 -->
+            <div class="blog-section">
+                <div class="blog-header">
+                    <h2 class="blog-title">📝 博客文章管理</h2>
+                </div>
+
+                <!-- 添加文章表单 -->
+                <div class="add-post-form">
+                    <h3 style="margin-bottom: 15px;">添加新文章</h3>
+                    <form id="addPostForm">
+                        <div class="form-group">
+                            <label for="postTitle">文章标题</label>
+                            <input type="text" id="postTitle" name="title" required placeholder="请输入文章标题">
+                        </div>
+                        <div class="form-group">
+                            <label for="postContent">文章内容</label>
+                            <textarea id="postContent" name="content" rows="4" required placeholder="请输入文章内容"></textarea>
+                        </div>
+                        <button type="submit" class="submit-btn">发布文章</button>
+                    </form>
+                </div>
+
+                <!-- 文章列表 -->
+                <div id="postsSection">
+                    <h3 style="margin-bottom: 15px;">最新文章</h3>
+                    <div id="postsList">
+                        <div class="loading">正在加载文章...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 服务配置
+        const services = [
+            {
+                name: 'Frontend (Nginx)',
+                endpoint: '/health',
+                description: '前端服务器 - 提供Web界面',
+                statusKey: 'frontend' // 用于从health响应中解析状态
+            },
+            {
+                name: 'Backend (Node.js)',
+                endpoint: '/health',
+                description: 'API服务器 - 处理业务逻辑',
+                statusKey: 'backend'
+            },
+            {
+                name: 'Database (MySQL)',
+                endpoint: '/health',
+                description: '数据库 - 存储文章数据',
+                statusKey: 'database'
+            },
+            {
+                name: 'Cache (Redis)',
+                endpoint: '/health',
+                description: '缓存服务 - 提升性能',
+                statusKey: 'redis'
+            },
+            {
+                name: 'Admin (Adminer)',
+                endpoint: '/health',
+                description: '数据库管理 - 可视化管理',
+                statusKey: 'admin'
+            }
+        ];
+
+        // 检查单个服务状态
+        async function checkServiceStatus(service) {
+            try {
+                const response = await fetch('/health', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 5000
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // 根据服务类型返回相应状态
+                    if (service.statusKey === 'frontend') {
+                        return {
+                            status: 'healthy',
+                            message: '服务正常',
+                            details: { status: 'Frontend accessible' }
+                        };
+                    } else if (service.statusKey === 'backend') {
+                        return {
+                            status: data.status === 'healthy' ? 'healthy' : 'unhealthy',
+                            message: data.status === 'healthy' ? '服务正常' : '服务异常',
+                            details: data
+                        };
+                    } else if (service.statusKey === 'database') {
+                        const dbStatus = data.services?.database === 'connected';
+                        return {
+                            status: dbStatus ? 'healthy' : 'unhealthy',
+                            message: dbStatus ? '已连接' : '连接失败',
+                            details: { database: data.services?.database }
+                        };
+                    } else if (service.statusKey === 'redis') {
+                        const redisStatus = data.services?.redis === 'connected';
+                        return {
+                            status: redisStatus ? 'healthy' : 'unhealthy',
+                            message: redisStatus ? '已连接' : '连接失败',
+                            details: { redis: data.services?.redis }
+                        };
+                    } else if (service.statusKey === 'admin') {
+                        // Adminer状态基于数据库连接状态
+                        const dbStatus = data.services?.database === 'connected';
+                        return {
+                            status: dbStatus ? 'healthy' : 'unhealthy',
+                            message: dbStatus ? '可访问' : '不可用',
+                            details: { admin: 'Available via port 8082' }
+                        };
+                    }
+                } else {
+                    return {
+                        status: 'unhealthy',
+                        message: `HTTP ${response.status}`,
+                        details: null
+                    };
+                }
+            } catch (error) {
+                return {
+                    status: 'unhealthy',
+                    message: error.message || '连接失败',
+                    details: null
+                };
+            }
+        }
+
+        // 创建服务状态卡片
+        function createServiceCard(service, status) {
+            const statusClass = status.status;
+            const iconClass = status.status;
+            
+            return `
+                <div class="status-card ${statusClass}">
+                    <div class="status-header">
+                        <div class="status-icon ${iconClass}"></div>
+                        <div class="service-name">${service.name}</div>
+                    </div>
+                    <div class="service-status">
+                        状态: <strong style="color: ${statusClass === 'healthy' ? '#4CAF50' : '#f44336'}">${status.message}</strong>
+                    </div>
+                    <div class="service-details">
+                        ${service.description}
+                        ${status.details ? `<br>详情: ${JSON.stringify(status.details, null, 2)}` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 检查所有服务
+        async function checkAllServices() {
+            const statusGrid = document.getElementById('statusGrid');
+            
+            // 显示加载状态
+            statusGrid.innerHTML = services.map(service => `
+                <div class="status-card loading">
+                    <div class="status-header">
+                        <div class="status-icon loading"></div>
+                        <div class="service-name">${service.name}</div>
+                    </div>
+                    <div class="service-status">检查中...</div>
+                    <div class="service-details">${service.description}</div>
+                </div>
+            `).join('');
+
+            // 并行检查所有服务
+            const results = await Promise.all(services.map(async (service) => {
+                const status = await checkServiceStatus(service);
+                return { service, status };
+            }));
+
+            // 更新显示
+            statusGrid.innerHTML = results.map(({ service, status }) => 
+                createServiceCard(service, status)
+            ).join('');
+        }
+
+        // 获取文章列表
+        async function loadPosts() {
+            try {
+                const response = await fetch('/posts');
+                if (response.ok) {
+                    const posts = await response.json();
+                    displayPosts(posts);
+                } else {
+                    document.getElementById('postsList').innerHTML = 
+                        '<div class="error">无法加载文章列表</div>';
+                }
+            } catch (error) {
+                document.getElementById('postsList').innerHTML = 
+                    '<div class="error">连接失败: ' + error.message + '</div>';
+            }
+        }
+
+        // 显示文章列表
+        function displayPosts(posts) {
+            const postsList = document.getElementById('postsList');
+            
+            if (posts.length === 0) {
+                postsList.innerHTML = '<div class="loading">暂无文章</div>';
+                return;
+            }
+
+            postsList.innerHTML = posts.map(post => `
+                <div class="post-card">
+                    <div class="post-title">${post.title}</div>
+                    <div class="post-content">${post.content}</div>
+                    <div class="post-date">发布时间: ${new Date(post.created_at).toLocaleString('zh-CN')}</div>
+                </div>
+            `).join('');
+        }
+
+        // 添加文章
+        async function addPost(title, content) {
+            try {
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title, content })
+                });
+
+                if (response.ok) {
+                    showMessage('文章发布成功！', 'success');
+                    document.getElementById('addPostForm').reset();
+                    loadPosts(); // 重新加载文章列表
+                } else {
+                    const error = await response.json();
+                    showMessage('发布失败: ' + error.message, 'error');
+                }
+            } catch (error) {
+                showMessage('发布失败: ' + error.message, 'error');
+            }
+        }
+
+        // 显示消息
+        function showMessage(message, type) {
+            const existingMessage = document.querySelector('.success, .error');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type;
+            messageDiv.textContent = message;
+            
+            const blogSection = document.querySelector('.blog-section');
+            blogSection.insertBefore(messageDiv, blogSection.firstChild);
+
+            // 3秒后自动消失
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+
+        // 自动刷新功能
+        let autoRefreshInterval;
+
+        function toggleAutoRefresh() {
+            const checkbox = document.getElementById('autoRefresh');
+            
+            if (checkbox.checked) {
+                autoRefreshInterval = setInterval(() => {
+                    checkAllServices();
+                    loadPosts();
+                }, 30000); // 30秒刷新一次
+            } else {
+                clearInterval(autoRefreshInterval);
+            }
+        }
+
+        // 事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始加载
+            checkAllServices();
+            loadPosts();
+            
+            // 自动刷新切换
+            document.getElementById('autoRefresh').addEventListener('change', toggleAutoRefresh);
+            toggleAutoRefresh(); // 初始化自动刷新
+            
+            // 表单提交
+            document.getElementById('addPostForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                const title = document.getElementById('postTitle').value.trim();
+                const content = document.getElementById('postContent').value.trim();
+                
+                if (title && content) {
+                    addPost(title, content);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

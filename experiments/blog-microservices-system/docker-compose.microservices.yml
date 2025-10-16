@@ -1,0 +1,226 @@
+version: '3.3'
+
+services:
+  # API网关 - 替代原来的frontend服务
+  api-gateway:
+    image: nginx:alpine
+    container_name: blog-microservices-gateway
+    ports:
+      - "8086:80"        # 主要入口端口
+      - "8087:8080"      # 管理接口端口
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./gateway/nginx.conf:/etc/nginx/nginx.conf
+      - ./gateway/logs:/var/log/nginx
+    depends_on:
+      - user-service
+      - post-service
+      - comment-service
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/api/simple-status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    environment:
+      - NGINX_WORKER_PROCESSES=auto
+      - NGINX_WORKER_CONNECTIONS=1024
+
+  # 用户服务
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: blog-microservices-user
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - JWT_SECRET=microservices-jwt-secret-key-2024-module5
+      - NODE_ENV=production
+      - PORT=3001
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # 文章服务
+  post-service:
+    build:
+      context: ./services/post-service
+      dockerfile: Dockerfile
+    container_name: blog-microservices-post
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - REDIS_HOST=cache
+      - NODE_ENV=production
+      - PORT=3002
+    depends_on:
+      - database
+      - cache
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # 评论服务
+  comment-service:
+    build:
+      context: ./services/comment-service
+      dockerfile: Dockerfile
+    container_name: blog-microservices-comment
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - NODE_ENV=production
+      - PORT=3003
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # 数据库服务 (完全复用Module 4配置)
+  database:
+    image: mysql:8.0
+    container_name: blog-microservices-database
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=blog_system
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=secret123
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+      - ./mysql.cnf:/etc/mysql/conf.d/mysql.cnf
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    ports:
+      - "3308:3306"  # 使用新端口避免冲突
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "bloguser", "-psecret123"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # 缓存服务 (复用Module 4配置)
+  cache:
+    image: redis:7-alpine
+    container_name: blog-microservices-cache
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    ports:
+      - "6382:6379"  # 使用新端口避免冲突
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+  # 数据库管理工具 (复用Module 4配置)
+  adminer:
+    image: adminer:latest
+    container_name: blog-microservices-adminer
+    ports:
+      - "8088:8080"  # 使用新端口避免冲突
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
+      - ADMINER_DESIGN=galkaev
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mysql_data:
+    driver: local
+    name: blog_microservices_mysql_data
+  redis_data:
+    driver: local
+    name: blog_microservices_redis_data
+
+networks:
+  microservices-network:
+    driver: bridge
+    name: blog-microservices-network
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
