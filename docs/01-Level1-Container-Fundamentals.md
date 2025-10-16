@@ -1975,156 +1975,1963 @@ docker-compose logs | grep -i warning
 
 ---
 
-## 📖 Module 5: 微服务架构设计
+## 📖 Module 5: 微服务架构设计与实践
 
 ### 🎯 学习目标
-- 理解微服务架构设计原则
-- 掌握服务拆分和API设计
-- 实现服务间通信和数据一致性
+- 理解微服务架构设计原则和拆分策略
+- 掌握从单体应用向微服务的渐进式演进
+- 实现API网关和服务间通信
+- 在Module 4基础上扩展用户认证和评论系统
 
 ### 📚 理论学习 (2小时)
 
-#### 5.1 微服务架构原则
+#### 5.1 微服务架构演进之路
+
+**从单体到微服务的渐进式演进**:
+```
+Module 4: 单体应用架构
+┌─────────────────────────────────────────────────┐
+│ Frontend → Backend (单体) → Database + Cache    │
+│ (Nginx)   (所有API集中)   (MySQL + Redis)      │
+└─────────────────────────────────────────────────┘
+
+Module 5: 微服务架构
+┌─────────────────────────────────────────────────────────────┐
+│ Frontend → API Gateway → [User Service]   → Shared Database │
+│ (React)   (Nginx路由)    [Post Service]   → (MySQL扩展)    │
+│                         [Comment Service] → + Cache        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 5.2 微服务设计原则
+
+**核心设计理念**:
 ```
 ┌─────────────────────────────────────────────────┐
-│               微服务设计原则                     │
+│            轻量级微服务设计原则                  │
 ├─────────────────────────────────────────────────┤
-│ • 单一职责: 每个服务专注一个业务领域            │
-│ • 自治性: 独立开发、部署、扩展                  │
-│ • 去中心化: 避免单点故障                       │
-│ • 故障隔离: 局部失败不影响整体                  │
-│ • 技术多样性: 选择最适合的技术栈                │
+│ ✅ 业务职责分离: 用户、文章、评论独立服务       │
+│ ✅ 数据共享优化: 共用数据库，减少复杂性        │
+│ ✅ 渐进式重构: 基于已有代码，最小化改动        │
+│ ✅ 接口标准化: 统一的RESTful API设计          │
+│ ✅ 故障隔离: 单服务异常不影响整体功能         │
+│ ✅ 独立部署: 每个服务可单独更新和扩展         │
 └─────────────────────────────────────────────────┘
 ```
 
-#### 5.2 服务拆分策略
-- **业务领域驱动**: 按业务功能拆分
-- **数据一致性**: 每个服务拥有独立数据库
-- **API契约**: 定义清晰的服务接口
-- **服务发现**: 动态发现和调用服务
+#### 5.3 服务拆分策略
 
-#### 5.3 通信模式
+**基于Module 4的服务拆分方案**:
 ```
-同步通信: HTTP/REST API, gRPC
-异步通信: 消息队列, 事件总线
-数据同步: Event Sourcing, CQRS
-```
+原始单体 backend/app.js 拆分为:
 
-### 🛠️ 实践操作 (5小时)
-
-#### 5.4 微服务架构设计
-```
-个人博客系统微服务拆分:
-├── user-service (用户管理)
-│   ├── 用户注册/登录
+├── user-service (用户管理微服务)
+│   ├── 用户注册、登录、JWT认证
 │   ├── 个人资料管理
-│   └── 权限控制
-├── post-service (文章管理)
-│   ├── 文章发布/编辑
-│   ├── 文章分类/标签
-│   └── 文章搜索
-├── comment-service (评论系统)
-│   ├── 评论发布/回复
-│   ├── 评论审核
-│   └── 评论统计
-└── notification-service (通知服务)
-    ├── 邮件通知
-    ├── 站内消息
-    └── 推送通知
+│   ├── 简单权限控制
+│   └── API: /users/*
+│
+├── post-service (文章管理微服务)
+│   ├── 复用现有文章CRUD逻辑
+│   ├── 文章与作者关联
+│   ├── 文章状态管理
+│   └── API: /posts/*
+│
+└── comment-service (评论系统微服务)
+    ├── 多级评论和回复
+    ├── 评论审核管理
+    ├── 评论统计功能
+    └── API: /comments/*
 ```
 
-#### 5.5 服务间通信实现
-```yaml
-# API Gateway 配置示例
+#### 5.4 API网关模式
+
+**统一入口和路由策略**:
+```nginx
+# API Gateway 路由规则
+upstream user_service {
+    server user-service:3001;
+}
+
+upstream post_service {
+    server post-service:3002;
+}
+
+upstream comment_service {
+    server comment-service:3003;
+}
+
+server {
+    listen 80;
+    
+    # 用户相关API
+    location /api/users/ {
+        proxy_pass http://user_service/;
+    }
+    
+    # 文章相关API  
+    location /api/posts/ {
+        proxy_pass http://post_service/;
+    }
+    
+    # 评论相关API
+    location /api/comments/ {
+        proxy_pass http://comment_service/;
+    }
+    
+    # 健康检查聚合
+    location /api/health {
+        proxy_pass http://post_service/health;
+    }
+}
+```
+
+### 🛠️ 实践操作 (4小时)
+
+#### 5.5 项目结构创建与代码复用
+
+**步骤1: 创建微服务版本项目**
+```bash
+# 复制Module 4的成功实践作为基础
+cp -r /root/copilot-docker-experiments/experiments/blog-compose-system/ \
+      /root/copilot-docker-experiments/experiments/blog-microservices-system/
+
+cd blog-microservices-system
+
+# 创建微服务目录结构
+mkdir -p services/{user-service,post-service,comment-service}
+mkdir -p gateway
+```
+
+**步骤2: 数据库结构扩展**
+```bash
+# 创建扩展的数据库初始化脚本
+cat > init-db/02-add-users.sql << 'EOF'
+-- 在现有blog_system数据库基础上扩展用户表
+USE blog_system;
+
+-- 用户表
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name VARCHAR(100),
+    avatar_url VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 为现有posts表添加作者关联
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS author_id INT DEFAULT 1;
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS status ENUM('draft', 'published') DEFAULT 'published';
+
+-- 插入示例用户
+INSERT IGNORE INTO users (id, username, email, password_hash, display_name) VALUES 
+(1, 'admin', 'admin@blog.com', '$2b$10$hash', '系统管理员'),
+(2, 'author1', 'author1@blog.com', '$2b$10$hash', '技术作者'),
+(3, 'reader1', 'reader1@blog.com', '$2b$10$hash', '普通读者');
+
+-- 更新现有文章的作者信息
+UPDATE posts SET author_id = 1 WHERE author IS NULL OR author = '系统管理员';
+UPDATE posts SET author_id = 2 WHERE author = 'Docker专家';
+EOF
+
+cat > init-db/03-add-comments.sql << 'EOF'
+-- 评论表
+USE blog_system;
+
+CREATE TABLE IF NOT EXISTS comments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    post_id INT NOT NULL,
+    user_id INT NOT NULL,
+    content TEXT NOT NULL,
+    parent_id INT DEFAULT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'approved',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE,
+    INDEX idx_post_id (post_id),
+    INDEX idx_user_id (user_id),
+    INDEX idx_parent_id (parent_id)
+);
+
+-- 插入示例评论
+INSERT IGNORE INTO comments (post_id, user_id, content) VALUES 
+(1, 2, '这篇文章写得非常好！Docker Compose确实让多容器管理变得简单。'),
+(1, 3, '感谢分享，学到了很多容器编排的知识。'),
+(2, 1, '微服务架构是现代应用开发的趋势，值得深入学习。');
+EOF
+```
+
+#### 5.6 微服务代码开发
+
+**步骤3: User Service 开发**
+```bash
+# 创建用户服务目录和依赖
+mkdir -p services/user-service
+cd services/user-service
+
+# 创建package.json (复用现有依赖)
+cat > package.json << 'EOF'
+{
+  "name": "user-service",
+  "version": "1.0.0",
+  "description": "User management microservice",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.0",
+    "bcrypt": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "cors": "^2.8.5"
+  }
+}
+EOF
+
+# 创建用户服务主文件 (基于Module 4的数据库连接逻辑)
+cat > app.js << 'EOF'
+const express = require('express');
+const mysql = require('mysql2/promise');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+
+const app = express();
+const port = 3001;
+
+// 中间件
+app.use(cors());
+app.use(express.json());
+
+// 数据库连接配置 (复用Module 4的配置)
+const dbConfig = {
+  host: process.env.DB_HOST || 'database',
+  user: process.env.DB_USER || 'bloguser',
+  password: process.env.DB_PASSWORD || 'secret123',
+  database: process.env.DB_NAME || 'blog_system',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+};
+
+let pool;
+
+(async () => {
+  try {
+    pool = mysql.createPool(dbConfig);
+    const connection = await pool.getConnection();
+    console.log('✅ User Service: Database connected successfully');
+    connection.release();
+  } catch (error) {
+    console.log('❌ User Service: Database connection failed:', error.message);
+  }
+})();
+
+// JWT密钥
+const JWT_SECRET = process.env.JWT_SECRET || 'user-service-secret-key';
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({ 
+    service: 'user-service',
+    status: 'healthy', 
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 用户注册
+app.post('/register', async (req, res) => {
+  try {
+    const { username, email, password, display_name } = req.body;
+    
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: 'Username, email, and password are required' });
+    }
+    
+    // 检查用户是否已存在
+    const [existing] = await pool.execute(
+      'SELECT id FROM users WHERE username = ? OR email = ?',
+      [username, email]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'Username or email already exists' });
+    }
+    
+    // 密码加密
+    const password_hash = await bcrypt.hash(password, 10);
+    
+    // 创建用户
+    const [result] = await pool.execute(
+      'INSERT INTO users (username, email, password_hash, display_name) VALUES (?, ?, ?, ?)',
+      [username, email, password_hash, display_name || username]
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId,
+      username,
+      email,
+      display_name: display_name || username,
+      message: 'User registered successfully' 
+    });
+  } catch (error) {
+    console.error('Error registering user:', error);
+    res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
+// 用户登录
+app.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
+    }
+    
+    // 查找用户
+    const [users] = await pool.execute(
+      'SELECT id, username, email, password_hash, display_name FROM users WHERE username = ? OR email = ?',
+      [username, username]
+    );
+    
+    if (users.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    const user = users[0];
+    
+    // 验证密码
+    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    // 生成JWT token
+    const token = jwt.sign(
+      { 
+        id: user.id, 
+        username: user.username,
+        email: user.email 
+      },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        display_name: user.display_name
+      }
+    });
+  } catch (error) {
+    console.error('Error logging in user:', error);
+    res.status(500).json({ error: 'Failed to login' });
+  }
+});
+
+// 获取用户信息
+app.get('/profile/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    const [users] = await pool.execute(
+      'SELECT id, username, email, display_name, avatar_url, created_at FROM users WHERE id = ?',
+      [userId]
+    );
+    
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json(users[0]);
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
+  }
+});
+
+// 获取所有用户列表 (用于作者选择)
+app.get('/list', async (req, res) => {
+  try {
+    const [users] = await pool.execute(
+      'SELECT id, username, display_name FROM users ORDER BY display_name'
+    );
+    
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users list:', error);
+    res.status(500).json({ error: 'Failed to fetch users list' });
+  }
+});
+
+// 启动服务器
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 User Service running on port ${port}`);
+});
+EOF
+
+# 创建Dockerfile (复用Module 4的构建逻辑)
+cat > Dockerfile << 'EOF'
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 复制package文件并安装依赖
+COPY package*.json ./
+RUN npm install --production
+
+# 安装curl用于健康检查
+RUN apk add --no-cache curl
+
+# 复制应用代码
+COPY . .
+
+# 创建非root用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# 更改文件权限
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+EXPOSE 3001
+
+CMD ["npm", "start"]
+EOF
+
+cd ../..
+```
+
+**步骤4: Post Service 开发 (复用Module 4代码)**
+```bash
+# 创建文章服务目录
+mkdir -p services/post-service
+cd services/post-service
+
+# 复制并修改现有的backend代码
+cp ../../backend/package.json .
+cp ../../backend/Dockerfile .
+
+# 创建专注于文章管理的服务
+cat > app.js << 'EOF'
+const express = require('express');
+const mysql = require('mysql2/promise');
+const cors = require('cors');
+
+const app = express();
+const port = 3002;
+
+// 中间件
+app.use(cors());
+app.use(express.json());
+
+// 数据库连接配置 (完全复用Module 4的配置)
+const dbConfig = {
+  host: process.env.DB_HOST || 'database',
+  user: process.env.DB_USER || 'bloguser',
+  password: process.env.DB_PASSWORD || 'secret123',
+  database: process.env.DB_NAME || 'blog_system',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+};
+
+let pool;
+
+(async () => {
+  try {
+    pool = mysql.createPool(dbConfig);
+    const connection = await pool.getConnection();
+    console.log('✅ Post Service: Database connected successfully');
+    connection.release();
+  } catch (error) {
+    console.log('❌ Post Service: Database connection failed:', error.message);
+  }
+})();
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({ 
+    service: 'post-service',
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    database: pool ? 'connected' : 'disconnected'
+  });
+});
+
+// 获取所有文章 (扩展为包含作者信息)
+app.get('/', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(`
+      SELECT p.id, p.title, p.content, p.author, p.created_at, p.status,
+             u.username as author_username, u.display_name as author_display_name
+      FROM posts p 
+      LEFT JOIN users u ON p.author_id = u.id
+      WHERE p.status = 'published'
+      ORDER BY p.created_at DESC
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching posts:', error);
+    res.status(500).json({ error: 'Failed to fetch posts' });
+  }
+});
+
+// 获取单篇文章
+app.get('/:id', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const [rows] = await pool.execute(`
+      SELECT p.id, p.title, p.content, p.author, p.created_at, p.status,
+             u.username as author_username, u.display_name as author_display_name
+      FROM posts p 
+      LEFT JOIN users u ON p.author_id = u.id
+      WHERE p.id = ? AND p.status = 'published'
+    `, [postId]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching post:', error);
+    res.status(500).json({ error: 'Failed to fetch post' });
+  }
+});
+
+// 创建新文章 (支持作者选择)
+app.post('/', async (req, res) => {
+  try {
+    const { title, content, author, author_id } = req.body;
+    
+    if (!title || !content) {
+      return res.status(400).json({ error: 'Title and content are required' });
+    }
+    
+    const [result] = await pool.execute(
+      'INSERT INTO posts (title, content, author, author_id, created_at, status) VALUES (?, ?, ?, ?, NOW(), ?)',
+      [title, content, author || 'Anonymous', author_id || 1, 'published']
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Post created successfully' 
+    });
+  } catch (error) {
+    console.error('Error creating post:', error);
+    res.status(500).json({ error: 'Failed to create post' });
+  }
+});
+
+// 获取文章统计信息
+app.get('/stats/summary', async (req, res) => {
+  try {
+    const [postCount] = await pool.execute('SELECT COUNT(*) as count FROM posts WHERE status = "published"');
+    const [authorCount] = await pool.execute('SELECT COUNT(DISTINCT author_id) as count FROM posts WHERE status = "published"');
+    
+    res.json({
+      totalPosts: postCount[0].count,
+      totalAuthors: authorCount[0].count,
+      service: 'post-service',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching post stats:', error);
+    res.status(500).json({ error: 'Failed to fetch post stats' });
+  }
+});
+
+// 启动服务器
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 Post Service running on port ${port}`);
+});
+EOF
+
+# 修改Dockerfile端口
+sed -i 's/EXPOSE 3000/EXPOSE 3002/' Dockerfile
+
+cd ../..
+```
+
+**步骤5: Comment Service 开发**
+```bash
+# 创建评论服务目录
+mkdir -p services/comment-service
+cd services/comment-service
+
+# 复制基础配置
+cp ../../backend/package.json .
+cp ../../backend/Dockerfile .
+
+# 创建评论管理服务
+cat > app.js << 'EOF'
+const express = require('express');
+const mysql = require('mysql2/promise');
+const cors = require('cors');
+
+const app = express();
+const port = 3003;
+
+// 中间件
+app.use(cors());
+app.use(express.json());
+
+// 数据库连接配置
+const dbConfig = {
+  host: process.env.DB_HOST || 'database',
+  user: process.env.DB_USER || 'bloguser',
+  password: process.env.DB_PASSWORD || 'secret123',
+  database: process.env.DB_NAME || 'blog_system',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+};
+
+let pool;
+
+(async () => {
+  try {
+    pool = mysql.createPool(dbConfig);
+    const connection = await pool.getConnection();
+    console.log('✅ Comment Service: Database connected successfully');
+    connection.release();
+  } catch (error) {
+    console.log('❌ Comment Service: Database connection failed:', error.message);
+  }
+})();
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({ 
+    service: 'comment-service',
+    status: 'healthy', 
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 获取文章的所有评论
+app.get('/post/:postId', async (req, res) => {
+  try {
+    const postId = req.params.postId;
+    
+    const [comments] = await pool.execute(`
+      SELECT c.id, c.content, c.created_at, c.parent_id,
+             u.username, u.display_name as author_name
+      FROM comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.post_id = ? AND c.status = 'approved'
+      ORDER BY c.created_at ASC
+    `, [postId]);
+    
+    res.json(comments);
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    res.status(500).json({ error: 'Failed to fetch comments' });
+  }
+});
+
+// 发布新评论
+app.post('/post/:postId', async (req, res) => {
+  try {
+    const postId = req.params.postId;
+    const { content, user_id, parent_id } = req.body;
+    
+    if (!content || !user_id) {
+      return res.status(400).json({ error: 'Content and user_id are required' });
+    }
+    
+    // 检查文章是否存在
+    const [posts] = await pool.execute('SELECT id FROM posts WHERE id = ?', [postId]);
+    if (posts.length === 0) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+    
+    // 检查用户是否存在
+    const [users] = await pool.execute('SELECT id FROM users WHERE id = ?', [user_id]);
+    if (users.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const [result] = await pool.execute(
+      'INSERT INTO comments (post_id, user_id, content, parent_id, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+      [postId, user_id, content, parent_id || null, 'approved']
+    );
+    
+    res.status(201).json({ 
+      id: result.insertId, 
+      message: 'Comment created successfully' 
+    });
+  } catch (error) {
+    console.error('Error creating comment:', error);
+    res.status(500).json({ error: 'Failed to create comment' });
+  }
+});
+
+// 获取评论统计信息
+app.get('/stats/summary', async (req, res) => {
+  try {
+    const [commentCount] = await pool.execute('SELECT COUNT(*) as count FROM comments WHERE status = "approved"');
+    const [postWithComments] = await pool.execute('SELECT COUNT(DISTINCT post_id) as count FROM comments WHERE status = "approved"');
+    
+    res.json({
+      totalComments: commentCount[0].count,
+      postsWithComments: postWithComments[0].count,
+      service: 'comment-service',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching comment stats:', error);
+    res.status(500).json({ error: 'Failed to fetch comment stats' });
+  }
+});
+
+// 删除评论 (简单实现)
+app.delete('/:commentId', async (req, res) => {
+  try {
+    const commentId = req.params.commentId;
+    
+    const [result] = await pool.execute(
+      'DELETE FROM comments WHERE id = ?',
+      [commentId]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+    
+    res.json({ message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ error: 'Failed to delete comment' });
+  }
+});
+
+// 启动服务器
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 Comment Service running on port ${port}`);
+});
+EOF
+
+# 修改Dockerfile端口
+sed -i 's/EXPOSE 3000/EXPOSE 3003/' Dockerfile
+
+cd ../..
+```
+
+#### 5.7 API网关配置
+
+**步骤6: 创建API网关配置**
+```bash
+# 创建网关目录和配置
+mkdir -p gateway
+
+# 创建API网关的Nginx配置 (基于Module 4扩展)
+cat > gateway/nginx.conf << 'EOF'
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    
+    # 上游服务定义
+    upstream user_service {
+        server user-service:3001;
+    }
+    
+    upstream post_service {
+        server post-service:3002;
+    }
+    
+    upstream comment_service {
+        server comment-service:3003;
+    }
+    
+    # 日志格式
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for" '
+                    'service="$upstream_addr"';
+    
+    access_log /var/log/nginx/access.log main;
+    
+    # 主服务器配置
+    server {
+        listen 80;
+        server_name localhost;
+        
+        # 静态文件服务 (复用Module 4的前端)
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+        }
+        
+        # 用户服务路由
+        location /api/users/ {
+            proxy_pass http://user_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # CORS处理
+            add_header Access-Control-Allow-Origin *;
+            add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header Access-Control-Allow-Headers 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            
+            if ($request_method = 'OPTIONS') {
+                return 204;
+            }
+        }
+        
+        # 文章服务路由  
+        location /api/posts/ {
+            proxy_pass http://post_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            add_header Access-Control-Allow-Origin *;
+            add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header Access-Control-Allow-Headers 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            
+            if ($request_method = 'OPTIONS') {
+                return 204;
+            }
+        }
+        
+        # 评论服务路由
+        location /api/comments/ {
+            proxy_pass http://comment_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            add_header Access-Control-Allow-Origin *;
+            add_header Access-Control-Allow-Methods 'GET, POST, PUT, DELETE, OPTIONS';
+            add_header Access-Control-Allow-Headers 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            
+            if ($request_method = 'OPTIONS') {
+                return 204;
+            }
+        }
+        
+        # 聚合健康检查
+        location /api/health {
+            proxy_pass http://post_service/health;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        
+        # 系统状态聚合 (调用所有服务的统计接口)
+        location /api/stats {
+            access_by_lua_block {
+                local http = require "resty.http"
+                local cjson = require "cjson"
+                
+                -- 这里可以实现统计信息聚合逻辑
+                -- 简化版本直接代理到post服务
+            }
+            proxy_pass http://post_service/stats/summary;
+        }
+        
+        # Nginx状态页面 (可选)
+        location /nginx_status {
+            stub_status on;
+            access_log off;
+            allow 127.0.0.1;
+            deny all;
+        }
+    }
+}
+EOF
+```
+
+#### 5.8 Docker Compose微服务编排
+
+**步骤7: 创建微服务版本的Docker Compose配置**
+```bash
+# 创建微服务版本的docker-compose文件
+cat > docker-compose.microservices.yml << 'EOF'
+version: '3.3'
+
 services:
+  # API网关 - 替代原来的frontend服务
   api-gateway:
     image: nginx:alpine
     ports:
-      - "80:80"
+      - "8086:80"  # 使用新端口避免与Module 4冲突
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-    depends_on:
-      - user-service
-      - post-service
-      - comment-service
-
-  user-service:
-    build: ./services/user
-    environment:
-      - DB_HOST=user-db
-      - SERVICE_PORT=3001
-
-  post-service:
-    build: ./services/post
-    environment:
-      - DB_HOST=post-db
-      - USER_SERVICE_URL=http://user-service:3001
-      - SERVICE_PORT=3002
-```
-
-### 🎪 动手项目: 微服务化博客系统
-
-**项目目标**: 将单体应用拆分为微服务架构
-
-```yaml
-# docker-compose.microservices.yml
-version: '3.8'
-
-services:
-  # API网关
-  gateway:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    volumes:
+      - ./frontend:/usr/share/nginx/html
       - ./gateway/nginx.conf:/etc/nginx/nginx.conf
     depends_on:
       - user-service
       - post-service
       - comment-service
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # 用户服务
   user-service:
-    build: ./services/user
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
     environment:
-      - DB_HOST=user-db
-      - JWT_SECRET=${JWT_SECRET}
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - JWT_SECRET=microservices-jwt-secret-key
+      - NODE_ENV=production
     depends_on:
-      - user-db
-
-  user-db:
-    image: postgres:15
-    environment:
-      - POSTGRES_DB=users
-      - POSTGRES_USER=userservice
-      - POSTGRES_PASSWORD=${USER_DB_PASSWORD}
-    volumes:
-      - user_data:/var/lib/postgresql/data
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # 文章服务
   post-service:
-    build: ./services/post
+    build:
+      context: ./services/post-service
+      dockerfile: Dockerfile
     environment:
-      - DB_HOST=post-db
-      - USER_SERVICE_URL=http://user-service:3001
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - NODE_ENV=production
     depends_on:
-      - post-db
+      - database
+      - cache
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  post-db:
-    image: postgres:15
+  # 评论服务
+  comment-service:
+    build:
+      context: ./services/comment-service
+      dockerfile: Dockerfile
     environment:
-      - POSTGRES_DB=posts
-      - POSTGRES_USER=postservice
-      - POSTGRES_PASSWORD=${POST_DB_PASSWORD}
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - NODE_ENV=production
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 数据库服务 (完全复用Module 4配置)
+  database:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=blog_system
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=secret123
     volumes:
-      - post_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+      - ./mysql.cnf:/etc/mysql/conf.d/mysql.cnf
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    ports:
+      - "3308:3306"  # 使用新端口避免冲突
+
+  # 缓存服务 (复用Module 4配置)
+  cache:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    ports:
+      - "6382:6379"  # 使用新端口避免冲突
+
+  # 数据库管理工具 (复用Module 4配置)
+  adminer:
+    image: adminer:latest
+    ports:
+      - "8083:8080"  # 使用新端口避免冲突
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
 
 volumes:
-  user_data:
-  post_data:
+  mysql_data:
+  redis_data:
+
+networks:
+  microservices-network:
+    driver: bridge
+    name: blog-microservices-network
+EOF
 ```
 
-**🤖 AI辅助提示**: 使用Copilot设计RESTful API接口和数据模型
+#### 5.9 前端界面升级
+
+**步骤8: 扩展前端界面以支持新功能**
+```bash
+# 备份原有前端文件
+cp frontend/index.html frontend/index.html.backup
+
+# 创建增强版前端界面
+cat > frontend/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微服务博客系统 - Module 5 演示</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; color: #333;
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        header { 
+            background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+            color: white; text-align: center; padding: 2rem; margin-bottom: 2rem; 
+            border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        
+        .header-nav { 
+            display: flex; justify-content: center; gap: 20px; margin-top: 15px;
+        }
+        
+        .nav-btn {
+            background: rgba(255,255,255,0.2); color: white; border: none;
+            padding: 8px 16px; border-radius: 20px; cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-btn:hover { background: rgba(255,255,255,0.3); }
+        .nav-btn.active { background: rgba(255,255,255,0.4); }
+        
+        .panel { 
+            background: white; margin-bottom: 20px; border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); overflow: hidden;
+        }
+        
+        .panel-header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 15px 20px; font-weight: 600;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .panel-content { padding: 20px; }
+        
+        .status-grid { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px; margin-bottom: 20px;
+        }
+        
+        .status-item { 
+            background: #f8f9fa; padding: 15px; border-radius: 8px;
+            border-left: 4px solid #28a745;
+            transition: all 0.3s ease;
+        }
+        
+        .status-item.checking { border-color: #ffc107; }
+        .status-item.error { border-color: #dc3545; }
+        
+        .service-name { font-weight: 600; margin-bottom: 5px; }
+        .service-desc { font-size: 0.9em; color: #666; margin-bottom: 8px; }
+        .service-status { 
+            display: inline-block; padding: 2px 8px; border-radius: 12px;
+            font-size: 0.8em; font-weight: 500; color: white;
+        }
+        
+        .status-healthy { background: #28a745; }
+        .status-checking { background: #ffc107; }
+        .status-error { background: #dc3545; }
+        
+        .form-group { margin-bottom: 15px; }
+        .form-row { display: flex; gap: 10px; align-items: end; }
+        
+        input, textarea, select { 
+            width: 100%; padding: 12px; border: 2px solid #e1e5e9;
+            border-radius: 6px; font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        
+        input:focus, textarea:focus, select:focus { 
+            outline: none; border-color: #667eea;
+        }
+        
+        textarea { resize: vertical; min-height: 100px; }
+        
+        button { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; padding: 12px 24px;
+            border-radius: 6px; cursor: pointer; font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        .btn-small { padding: 6px 12px; font-size: 0.85em; }
+        .btn-danger { background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); }
+        
+        .post-item, .comment-item { 
+            background: #f8f9fa; padding: 15px; margin-bottom: 15px;
+            border-radius: 8px; border-left: 4px solid #667eea;
+        }
+        
+        .post-title { font-weight: 600; margin-bottom: 8px; color: #333; }
+        .post-meta { font-size: 0.9em; color: #666; margin-bottom: 10px; }
+        .post-content { line-height: 1.6; }
+        
+        .comment-item { margin-left: 20px; border-left-color: #28a745; }
+        .comment-author { font-weight: 600; color: #667eea; }
+        .comment-content { margin-top: 5px; }
+        
+        .auth-section { 
+            background: rgba(255,255,255,0.95); padding: 20px; border-radius: 12px;
+            margin-bottom: 20px; display: none;
+        }
+        
+        .auth-section.active { display: block; }
+        
+        .user-info { 
+            background: rgba(102,126,234,0.1); padding: 15px; border-radius: 8px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        .refresh-btn { 
+            background: rgba(255,255,255,0.2); color: #667eea; border: 1px solid #667eea;
+            padding: 6px 12px; border-radius: 4px; cursor: pointer;
+        }
+        
+        .loading { 
+            display: inline-block; width: 20px; height: 20px;
+            border: 2px solid #f3f3f3; border-top: 2px solid #667eea;
+            border-radius: 50%; animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .hidden { display: none !important; }
+        
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header-nav { flex-wrap: wrap; }
+            .form-row { flex-direction: column; }
+            .status-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 微服务博客系统</h1>
+            <p>Docker Compose + 微服务架构演示 (Module 5)</p>
+            <div class="header-nav">
+                <button class="nav-btn active" onclick="showSection('dashboard')">系统监控</button>
+                <button class="nav-btn" onclick="showSection('auth')">用户认证</button>
+                <button class="nav-btn" onclick="showSection('posts')">文章管理</button>
+                <button class="nav-btn" onclick="showSection('comments')">评论系统</button>
+            </div>
+        </header>
+
+        <!-- 系统监控面板 -->
+        <div id="dashboard-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>📊 微服务状态监控</span>
+                    <button class="refresh-btn" onclick="checkAllServices()">
+                        <span id="refresh-icon">🔄</span> 刷新状态
+                    </button>
+                </div>
+                <div class="panel-content">
+                    <div class="status-grid" id="services-status">
+                        <!-- 动态加载服务状态 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 用户认证面板 -->
+        <div id="auth-section" class="auth-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>👤 用户认证系统</span>
+                </div>
+                <div class="panel-content">
+                    <div id="login-form">
+                        <h3>用户登录</h3>
+                        <div class="form-group">
+                            <input type="text" id="login-username" placeholder="用户名或邮箱">
+                        </div>
+                        <div class="form-group">
+                            <input type="password" id="login-password" placeholder="密码">
+                        </div>
+                        <button onclick="loginUser()">登录</button>
+                        <button onclick="showRegisterForm()" style="margin-left: 10px;">注册新用户</button>
+                    </div>
+
+                    <div id="register-form" class="hidden">
+                        <h3>用户注册</h3>
+                        <div class="form-group">
+                            <input type="text" id="reg-username" placeholder="用户名">
+                        </div>
+                        <div class="form-group">
+                            <input type="email" id="reg-email" placeholder="邮箱地址">
+                        </div>
+                        <div class="form-group">
+                            <input type="password" id="reg-password" placeholder="密码">
+                        </div>
+                        <div class="form-group">
+                            <input type="text" id="reg-display-name" placeholder="显示名称（可选）">
+                        </div>
+                        <button onclick="registerUser()">注册</button>
+                        <button onclick="showLoginForm()" style="margin-left: 10px;">返回登录</button>
+                    </div>
+
+                    <div id="user-info" class="user-info hidden">
+                        <!-- 用户信息显示区域 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文章管理面板 -->
+        <div id="posts-section" class="auth-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>📝 文章发布系统</span>
+                </div>
+                <div class="panel-content">
+                    <form id="post-form">
+                        <div class="form-row">
+                            <div style="flex: 2;">
+                                <input type="text" id="post-title" placeholder="文章标题" required>
+                            </div>
+                            <div style="flex: 1;">
+                                <select id="post-author">
+                                    <option value="">选择作者...</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button type="submit">发布文章</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <textarea id="post-content" placeholder="文章内容..." required></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span>📚 文章列表</span>
+                    <button class="refresh-btn" onclick="loadPosts()">刷新列表</button>
+                </div>
+                <div class="panel-content">
+                    <div id="posts-container">正在加载文章...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 评论系统面板 -->
+        <div id="comments-section" class="auth-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>💬 评论系统</span>
+                </div>
+                <div class="panel-content">
+                    <div id="comments-container">
+                        <p>请先选择一篇文章查看评论...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentUser = null;
+        let authToken = null;
+        let currentSection = 'dashboard';
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAllServices();
+            loadUsers();
+            loadPosts();
+            
+            // 检查本地存储的登录状态
+            const savedToken = localStorage.getItem('authToken');
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedToken && savedUser) {
+                authToken = savedToken;
+                currentUser = JSON.parse(savedUser);
+                updateUserInterface();
+            }
+        });
+
+        // 节面切换
+        function showSection(section) {
+            // 更新导航按钮状态
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 隐藏所有sections
+            document.querySelectorAll('[id$="-section"]').forEach(sec => {
+                sec.style.display = 'none';
+            });
+            
+            // 显示目标section
+            document.getElementById(section + '-section').style.display = 'block';
+            currentSection = section;
+        }
+
+        // 服务状态检查
+        async function checkAllServices() {
+            const refreshIcon = document.getElementById('refresh-icon');
+            refreshIcon.textContent = '⏳';
+            
+            const services = [
+                { name: 'API网关', endpoint: '/api/health', desc: 'Nginx反向代理和路由' },
+                { name: '用户服务', endpoint: '/api/users/health', desc: '认证、注册、用户管理' },
+                { name: '文章服务', endpoint: '/api/posts/health', desc: '文章发布、编辑、查询' },
+                { name: '评论服务', endpoint: '/api/comments/health', desc: '评论发布、审核、管理' },
+                { name: '数据库', endpoint: '/api/posts/health', desc: 'MySQL数据持久化' }
+            ];
+
+            const container = document.getElementById('services-status');
+            container.innerHTML = '';
+
+            for (const service of services) {
+                const statusItem = createServiceStatusItem(service);
+                container.appendChild(statusItem);
+                
+                try {
+                    const response = await fetch(service.endpoint);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        updateServiceStatus(statusItem, 'healthy', `✅ 运行正常 (${data.service || 'API'})`);
+                    } else {
+                        updateServiceStatus(statusItem, 'error', `❌ 服务异常 (${response.status})`);
+                    }
+                } catch (error) {
+                    updateServiceStatus(statusItem, 'error', `❌ 连接失败: ${error.message}`);
+                }
+            }
+            
+            refreshIcon.textContent = '🔄';
+        }
+
+        function createServiceStatusItem(service) {
+            const item = document.createElement('div');
+            item.className = 'status-item checking';
+            item.innerHTML = `
+                <div class="service-name">${service.name}</div>
+                <div class="service-desc">${service.desc}</div>
+                <div class="service-status status-checking">🔄 检查中...</div>
+            `;
+            return item;
+        }
+
+        function updateServiceStatus(item, status, message) {
+            const statusEl = item.querySelector('.service-status');
+            statusEl.textContent = message;
+            statusEl.className = `service-status status-${status}`;
+            item.className = `status-item ${status}`;
+        }
+
+        // 用户认证相关函数
+        function showLoginForm() {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('register-form').classList.add('hidden');
+        }
+
+        function showRegisterForm() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+        }
+
+        async function registerUser() {
+            const username = document.getElementById('reg-username').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const display_name = document.getElementById('reg-display-name').value;
+
+            if (!username || !email || !password) {
+                alert('请填写所有必填字段');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/users/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password, display_name })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('注册成功！请登录');
+                    showLoginForm();
+                    // 清空表单
+                    document.getElementById('reg-username').value = '';
+                    document.getElementById('reg-email').value = '';
+                    document.getElementById('reg-password').value = '';
+                    document.getElementById('reg-display-name').value = '';
+                } else {
+                    alert('注册失败: ' + data.error);
+                }
+            } catch (error) {
+                alert('注册请求失败: ' + error.message);
+            }
+        }
+
+        async function loginUser() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                alert('请输入用户名和密码');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/users/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.token;
+                    currentUser = data.user;
+                    
+                    // 保存到本地存储
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    
+                    updateUserInterface();
+                    alert('登录成功！');
+                } else {
+                    alert('登录失败: ' + data.error);
+                }
+            } catch (error) {
+                alert('登录请求失败: ' + error.message);
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            updateUserInterface();
+        }
+
+        function updateUserInterface() {
+            const loginForm = document.getElementById('login-form');
+            const registerForm = document.getElementById('register-form');
+            const userInfo = document.getElementById('user-info');
+
+            if (currentUser) {
+                loginForm.classList.add('hidden');
+                registerForm.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                
+                userInfo.innerHTML = `
+                    <div>
+                        <strong>👤 ${currentUser.display_name || currentUser.username}</strong>
+                        <div style="font-size: 0.9em; color: #666;">${currentUser.email}</div>
+                    </div>
+                    <button onclick="logout()" class="btn-small btn-danger">退出登录</button>
+                `;
+            } else {
+                loginForm.classList.remove('hidden');
+                registerForm.classList.add('hidden');
+                userInfo.classList.add('hidden');
+            }
+        }
+
+        // 加载用户列表(用于作者选择)
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users/list');
+                const users = await response.json();
+                
+                const select = document.getElementById('post-author');
+                select.innerHTML = '<option value="">选择作者...</option>';
+                
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = user.display_name || user.username;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('加载用户列表失败:', error);
+            }
+        }
+
+        // 文章相关函数
+        async function loadPosts() {
+            try {
+                const response = await fetch('/api/posts/');
+                const posts = await response.json();
+                
+                const container = document.getElementById('posts-container');
+                
+                if (posts.length === 0) {
+                    container.innerHTML = '<p>暂无文章，发布第一篇文章吧！</p>';
+                    return;
+                }
+                
+                container.innerHTML = posts.map(post => `
+                    <div class="post-item" onclick="showComments(${post.id})">
+                        <div class="post-title">${post.title}</div>
+                        <div class="post-meta">
+                            作者: ${post.author_display_name || post.author} | 
+                            发布时间: ${new Date(post.created_at).toLocaleString()}
+                            ${post.id ? ' | 点击查看评论' : ''}
+                        </div>
+                        <div class="post-content">${post.content.substring(0, 200)}${post.content.length > 200 ? '...' : ''}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('posts-container').innerHTML = '<p>加载文章失败: ' + error.message + '</p>';
+            }
+        }
+
+        // 发布文章
+        document.getElementById('post-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const title = document.getElementById('post-title').value;
+            const content = document.getElementById('post-content').value;
+            const author_id = document.getElementById('post-author').value;
+            
+            if (!title || !content) {
+                alert('请填写标题和内容');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/posts/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        title, 
+                        content, 
+                        author: currentUser?.display_name || '匿名用户',
+                        author_id: author_id || currentUser?.id || 1
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('文章发布成功！');
+                    document.getElementById('post-title').value = '';
+                    document.getElementById('post-content').value = '';
+                    loadPosts();
+                } else {
+                    alert('发布失败: ' + data.error);
+                }
+            } catch (error) {
+                alert('发布请求失败: ' + error.message);
+            }
+        });
+
+        // 评论相关函数
+        async function showComments(postId) {
+            if (currentSection !== 'comments') {
+                showSection('comments');
+            }
+            
+            try {
+                const response = await fetch(`/api/comments/post/${postId}`);
+                const comments = await response.json();
+                
+                const container = document.getElementById('comments-container');
+                
+                if (comments.length === 0) {
+                    container.innerHTML = `
+                        <p>暂无评论</p>
+                        ${currentUser ? `
+                            <div style="margin-top: 20px;">
+                                <textarea id="new-comment-${postId}" placeholder="发表评论..." style="width: 100%; height: 80px;"></textarea>
+                                <button onclick="addComment(${postId})" style="margin-top: 10px;">发表评论</button>
+                            </div>
+                        ` : '<p>请先登录后发表评论</p>'}
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <h3>文章评论 (${comments.length}条)</h3>
+                    ${comments.map(comment => `
+                        <div class="comment-item">
+                            <div class="comment-author">${comment.author_name}</div>
+                            <div class="comment-content">${comment.content}</div>
+                            <div style="font-size: 0.8em; color: #999; margin-top: 5px;">
+                                ${new Date(comment.created_at).toLocaleString()}
+                            </div>
+                        </div>
+                    `).join('')}
+                    
+                    ${currentUser ? `
+                        <div style="margin-top: 20px;">
+                            <textarea id="new-comment-${postId}" placeholder="发表评论..." style="width: 100%; height: 80px;"></textarea>
+                            <button onclick="addComment(${postId})" style="margin-top: 10px;">发表评论</button>
+                        </div>
+                    ` : '<p>请先登录后发表评论</p>'}
+                `;
+            } catch (error) {
+                document.getElementById('comments-container').innerHTML = '<p>加载评论失败: ' + error.message + '</p>';
+            }
+        }
+
+        async function addComment(postId) {
+            if (!currentUser) {
+                alert('请先登录');
+                return;
+            }
+            
+            const content = document.getElementById(`new-comment-${postId}`).value;
+            if (!content.trim()) {
+                alert('请输入评论内容');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/comments/post/${postId}`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({ 
+                        content,
+                        user_id: currentUser.id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('评论发布成功！');
+                    showComments(postId); // 重新加载评论
+                } else {
+                    alert('评论发布失败: ' + data.error);
+                }
+            } catch (error) {
+                alert('评论请求失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
+EOF
+```
+
+#### 5.10 系统部署和验证
+
+**步骤9: 一键部署脚本**
+```bash
+# 创建部署脚本
+cat > deploy-microservices.sh << 'EOF'
+#!/bin/bash
+
+echo "🚀 启动微服务博客系统..."
+
+# 检查必要的文件
+if [[ ! -f "docker-compose.microservices.yml" ]]; then
+    echo "❌ 未找到 docker-compose.microservices.yml 文件"
+    exit 1
+fi
+
+# 停止可能运行的容器
+echo "📦 清理现有容器..."
+docker-compose -f docker-compose.microservices.yml down
+
+# 构建和启动所有服务
+echo "🔨 构建并启动微服务..."
+docker-compose -f docker-compose.microservices.yml up --build -d
+
+# 等待服务启动
+echo "⏳ 等待服务启动完成..."
+sleep 15
+
+# 健康检查
+echo "🔍 检查服务状态..."
+docker-compose -f docker-compose.microservices.yml ps
+
+echo ""
+echo "✅ 微服务博客系统部署完成！"
+echo ""
+echo "📋 访问地址:"
+echo "   🌐 博客主页: http://192.168.14.201:8086"
+echo "   💾 数据库管理: http://192.168.14.201:8083"
+echo "   📊 服务监控: http://192.168.14.201:8086"
+echo ""
+echo "🧪 测试命令:"
+echo "   curl http://192.168.14.201:8086/api/health"
+echo "   curl http://192.168.14.201:8086/api/users/health" 
+echo "   curl http://192.168.14.201:8086/api/posts/"
+echo ""
+EOF
+
+chmod +x deploy-microservices.sh
+```
+
+**步骤10: 系统验证**
+```bash
+# 运行部署脚本
+./deploy-microservices.sh
+
+# 等待服务完全启动
+sleep 20
+
+# 验证各个微服务
+echo "🔍 验证微服务健康状态..."
+
+curl -s http://localhost:8086/api/users/health | jq '.'
+curl -s http://localhost:8086/api/posts/health | jq '.'  
+curl -s http://localhost:8086/api/comments/health | jq '.'
+
+# 测试用户注册和登录
+echo "🧪 测试用户功能..."
+curl -X POST http://localhost:8086/api/users/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"testuser","email":"test@blog.com","password":"test123","display_name":"测试用户"}'
+
+# 测试文章发布
+echo "📝 测试文章发布..."
+curl -X POST http://localhost:8086/api/posts/ \
+  -H "Content-Type: application/json" \
+  -d '{"title":"微服务架构测试文章","content":"这是一篇通过微服务架构发布的文章。","author":"测试用户","author_id":1}'
+
+# 获取文章列表
+echo "📚 获取文章列表..."
+curl -s http://localhost:8086/api/posts/ | jq '.'
+```
+
+### 🎯 Module 5 项目验收与成果总结
+
+#### 学习成果验收
+
+**✅ 核心技术掌握**
+1. **微服务架构设计** - 成功将单体应用拆分为3个独立微服务
+2. **API网关模式** - 实现统一入口和服务路由转发  
+3. **渐进式重构** - 在不破坏现有功能基础上升级架构
+4. **容器编排进阶** - 掌握复杂场景下的Docker Compose配置
+
+**✅ 功能验收清单**
+
+**基础功能保持兼容** (复用Module 4)：
+- [ ] 文章发布和列表查看
+- [ ] 数据库数据持久化  
+- [ ] 缓存系统正常工作
+- [ ] 管理界面访问正常
+- [ ] 服务状态监控面板
+
+**新增微服务功能**：
+- [ ] 用户注册和登录系统
+- [ ] JWT认证和会话管理
+- [ ] 文章作者关联功能
+- [ ] 评论发布和显示系统
+- [ ] API网关路由和负载分发
+
+**架构升级验证**：
+- [ ] 3个微服务独立运行
+- [ ] 服务间HTTP通信正常
+- [ ] 数据库表结构正确扩展
+- [ ] 服务健康检查机制
+- [ ] 容错和故障隔离
+
+#### 💼 用户体验验证
+
+**访问地址测试**：
+```bash
+# 主应用界面
+curl http://192.168.14.201:8086
+
+# 微服务健康检查
+curl http://192.168.14.201:8086/api/users/health
+curl http://192.168.14.201:8086/api/posts/health  
+curl http://192.168.14.201:8086/api/comments/health
+
+# 数据库管理
+curl http://192.168.14.201:8083
+```
+
+**功能完整性测试**：
+1. **用户系统测试**
+   - 注册新用户账号
+   - 用户登录获取Token
+   - 查看用户个人资料
+
+2. **文章系统测试**
+   - 选择作者发布文章
+   - 文章列表正确显示
+   - 作者信息正确关联
+
+3. **评论系统测试**
+   - 登录用户发布评论
+   - 评论列表实时更新
+   - 评论时间正确显示
+
+4. **API网关测试**
+   - 不同服务路由正确
+   - CORS跨域正常处理
+   - 错误处理和响应
+
+#### 📊 性能和可靠性指标
+
+**服务性能**：
+- API响应时间 < 200ms
+- 页面加载时间 < 3秒
+- 并发用户支持 > 10个
+- 内存使用 < 1GB总计
+
+**可靠性指标**：
+- 服务可用性 > 99%
+- 数据一致性 100%
+- 故障恢复时间 < 30秒
+- 零数据丢失
+
+#### 🔧 故障排除指南
+
+**常见问题和解决方案**：
+
+1. **服务无法启动**
+   ```bash
+   # 查看服务日志
+   docker-compose -f docker-compose.microservices.yml logs user-service
+   
+   # 检查端口冲突
+   netstat -tlnp | grep 8086
+   ```
+
+2. **数据库连接失败**
+   ```bash
+   # 检查数据库状态
+   docker-compose -f docker-compose.microservices.yml exec database mysql -u bloguser -p
+   
+   # 验证数据库初始化
+   docker-compose -f docker-compose.microservices.yml logs database
+   ```
+
+3. **API网关路由问题**
+   ```bash
+   # 检查nginx配置
+   docker-compose -f docker-compose.microservices.yml exec api-gateway nginx -t
+   
+   # 查看代理日志
+   docker-compose -f docker-compose.microservices.yml logs api-gateway
+   ```
+
+4. **服务间通信异常**
+   ```bash
+   # 网络连通性测试
+   docker-compose -f docker-compose.microservices.yml exec user-service ping post-service
+   
+   # 服务发现验证
+   docker-compose -f docker-compose.microservices.yml exec user-service nslookup post-service
+   ```
+
+#### 🚀 扩展学习建议
+
+**完成Module 5后的进阶方向**：
+
+1. **服务治理优化**
+   - 实现服务注册与发现
+   - 添加断路器模式
+   - 配置重试和超时策略
+
+2. **监控和可观测性**
+   - 集成应用性能监控
+   - 实现分布式链路追踪
+   - 添加业务指标收集
+
+3. **安全性增强**
+   - OAuth2.0认证集成
+   - API访问速率限制
+   - 数据加密和脱敏
+
+4. **DevOps实践**
+   - CI/CD流水线搭建
+   - 自动化测试集成
+   - 蓝绿部署策略
+
+#### 🎯 与Module 4的对比总结
+
+| 方面 | Module 4 (单体架构) | Module 5 (微服务架构) |
+|------|-------------------|---------------------|
+| **服务数量** | 1个后端服务 | 3个微服务 + API网关 |
+| **功能复杂度** | 基础博客功能 | 用户认证 + 评论系统 |
+| **代码复用率** | N/A | >70%复用现有代码 |
+| **扩展性** | 整体扩展 | 单服务独立扩展 |
+| **故障隔离** | 单点故障 | 服务级故障隔离 |
+| **开发复杂度** | 简单直接 | 中等复杂度 |
+| **运维复杂度** | 低 | 中等 |
+| **学习价值** | 容器基础 | 微服务架构设计 |
+
+**🤖 AI辅助提示**: 使用GitHub Copilot可以快速生成微服务API接口、数据库查询语句和前端交互代码，显著提升开发效率。
 
 ---
 
