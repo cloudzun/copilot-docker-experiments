@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Module 5 微服务博客系统演示</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .services {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .service {
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .service.online {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        .service.offline {
+            border-color: #dc3545;
+            background: #f8d7da;
+        }
+        .service h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .status.online {
+            background: #28a745;
+            color: white;
+        }
+        .status.offline {
+            background: #dc3545;
+            color: white;
+        }
+        .test-section {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #e9ecef;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Module 5 微服务博客系统演示</h1>
+        
+        <div class="services">
+            <div class="service" id="gateway-service">
+                <h3>🚪 API网关</h3>
+                <p>端口: 8086 (主要) / 8087 (管理)</p>
+                <span class="status" id="gateway-status">检查中...</span>
+            </div>
+            
+            <div class="service" id="user-service">
+                <h3>👤 用户服务</h3>
+                <p>端口: 3001 (内部)</p>
+                <span class="status" id="user-status">检查中...</span>
+            </div>
+            
+            <div class="service" id="post-service">
+                <h3>📝 文章服务</h3>
+                <p>端口: 3002 (内部)</p>
+                <span class="status" id="post-status">检查中...</span>
+            </div>
+            
+            <div class="service" id="comment-service">
+                <h3>💬 评论服务</h3>
+                <p>端口: 3003 (内部)</p>
+                <span class="status" id="comment-status">检查中...</span>
+            </div>
+            
+            <div class="service" id="database-service">
+                <h3>🗄️ 数据库</h3>
+                <p>MySQL 8.0 - 端口: 3308</p>
+                <span class="status" id="database-status">运行中</span>
+            </div>
+            
+            <div class="service" id="cache-service">
+                <h3>⚡ 缓存</h3>
+                <p>Redis 7 - 端口: 6382</p>
+                <span class="status" id="cache-status">运行中</span>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 功能测试</h3>
+            <div>
+                <button class="test-button" onclick="testUserRegistration()">测试用户注册</button>
+                <button class="test-button" onclick="testUserLogin()">测试用户登录</button>
+                <button class="test-button" onclick="testCreatePost()">测试创建文章</button>
+                <button class="test-button" onclick="testGetPosts()">测试获取文章</button>
+                <button class="test-button" onclick="testCreateComment()">测试创建评论</button>
+                <button class="test-button" onclick="testDirectAPI()">直接API测试</button>
+            </div>
+            <div id="test-results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 系统信息</h3>
+            <p><strong>架构:</strong> 微服务架构 (vs Module 4 单体架构)</p>
+            <p><strong>服务数量:</strong> 6个容器 (网关、用户、文章、评论、数据库、缓存)</p>
+            <p><strong>技术栈:</strong> Node.js + Express + MySQL + Redis + Nginx</p>
+            <p><strong>认证:</strong> JWT令牌</p>
+            <p><strong>缓存:</strong> Redis (文章服务)</p>
+            <p><strong>数据库管理:</strong> <a href="http://localhost:8088" target="_blank">Adminer (8088)</a></p>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        // 检查服务状态
+        async function checkServices() {
+            try {
+                // 检查API网关
+                const gatewayRes = await fetch('/api/simple-status');
+                updateServiceStatus('gateway', gatewayRes.ok);
+                
+                // 检查用户服务
+                const userRes = await fetch('/api/users/health');
+                updateServiceStatus('user', userRes.ok);
+                
+                // 检查文章服务
+                const postRes = await fetch('/api/posts/health');
+                updateServiceStatus('post', postRes.ok);
+                
+                // 检查评论服务
+                const commentRes = await fetch('/api/comments/health');
+                updateServiceStatus('comment', commentRes.ok);
+                
+            } catch (error) {
+                console.error('检查服务状态失败:', error);
+            }
+        }
+
+        function updateServiceStatus(service, isOnline) {
+            const serviceEl = document.getElementById(service + '-service');
+            const statusEl = document.getElementById(service + '-status');
+            
+            if (isOnline) {
+                serviceEl.className = 'service online';
+                statusEl.className = 'status online';
+                statusEl.textContent = '在线';
+            } else {
+                serviceEl.className = 'service offline';
+                statusEl.className = 'status offline';
+                statusEl.textContent = '离线';
+            }
+        }
+
+        function addResult(message, isSuccess = true) {
+            const resultsDiv = document.getElementById('test-results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result ' + (isSuccess ? 'success' : 'error');
+            resultDiv.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        async function testUserRegistration() {
+            try {
+                const response = await fetch('/api/users/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'demo_' + Date.now(),
+                        email: `demo${Date.now()}@example.com`,
+                        password: '123456'
+                    })
+                });
+                
+                if (response.ok) {
+                    addResult('✅ 用户注册成功');
+                } else {
+                    const error = await response.text();
+                    addResult('❌ 用户注册失败: ' + error, false);
+                }
+            } catch (error) {
+                addResult('❌ 用户注册错误: ' + error.message, false);
+            }
+        }
+
+        async function testUserLogin() {
+            try {
+                const response = await fetch('/api/users/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: 'testuser',
+                        password: '123456'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.token;
+                    addResult('✅ 用户登录成功，获得JWT令牌');
+                } else {
+                    addResult('❌ 用户登录失败', false);
+                }
+            } catch (error) {
+                addResult('❌ 用户登录错误: ' + error.message, false);
+            }
+        }
+
+        async function testCreatePost() {
+            if (!authToken) {
+                addResult('❌ 请先登录获取令牌', false);
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/posts/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({
+                        title: `测试文章 ${new Date().toLocaleString()}`,
+                        content: '这是通过微服务API创建的测试文章！'
+                    })
+                });
+                
+                if (response.ok) {
+                    addResult('✅ 文章创建成功');
+                } else {
+                    const error = await response.text();
+                    addResult('❌ 文章创建失败: ' + error, false);
+                }
+            } catch (error) {
+                addResult('❌ 文章创建错误: ' + error.message, false);
+            }
+        }
+
+        async function testGetPosts() {
+            try {
+                addResult('🔍 开始获取文章列表...');
+                
+                const response = await fetch('/api/posts');
+                if (response.ok) {
+                    const data = await response.json();
+                    addResult(`✅ 成功获取 ${data.posts.length} 篇文章:`);
+                    
+                    data.posts.forEach((post, index) => {
+                        addResult(`   ${index + 1}. "${post.title}" (ID: ${post.id})`);
+                    });
+                    
+                    addResult(`📊 分页信息: 第${data.pagination.page}页，共${data.pagination.totalPages}页`);
+                } else {
+                    const error = await response.text();
+                    addResult(`❌ 获取文章失败: ${response.status} ${response.statusText}`, false);
+                    addResult(`错误详情: ${error}`, false);
+                }
+            } catch (error) {
+                addResult('❌ 获取文章错误: ' + error.message, false);
+            }
+        }
+
+        async function testCreateComment() {
+            try {
+                addResult('💬 开始创建评论...');
+                
+                // 先确保用户已登录
+                if (!authToken) {
+                    addResult('⚠️ 需要先登录才能创建评论', false);
+                    return;
+                }
+                
+                // 使用文章ID 1，根据评论服务的实际路由 /post/:id
+                const postId = 1;
+                const commentData = {
+                    content: '这是通过演示页面创建的测试评论！时间：' + new Date().toLocaleString(),
+                    user_id: 2  // 评论服务期望user_id参数
+                };
+                
+                addResult(`📝 尝试为文章 ${postId} 创建评论...`);
+                
+                const response = await fetch(`/api/comments/post/${postId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(commentData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    addResult(`✅ 评论创建成功！评论ID: ${result.id}`);
+                    
+                    // 创建成功后，立即获取该文章的评论列表验证
+                    addResult('🔍 验证评论是否已创建，获取文章评论列表...');
+                    const getCommentsResponse = await fetch(`/api/comments/post/${postId}`);
+                    if (getCommentsResponse.ok) {
+                        const commentsData = await getCommentsResponse.json();
+                        addResult(`✅ 验证成功！文章${postId}现有评论数: ${commentsData.comments.length}`);
+                        if (commentsData.comments.length > 0) {
+                            addResult(`📝 最新评论: "${commentsData.comments[commentsData.comments.length-1].content}"`);
+                        }
+                    }
+                } else {
+                    const error = await response.text();
+                    addResult(`❌ 创建评论失败: ${response.status} ${response.statusText}`, false);
+                    addResult(`错误详情: ${error}`, false);
+                    
+                    // 如果是字段错误，尝试使用author_id
+                    if (error.includes('user_id')) {
+                        addResult('🔄 尝试使用 author_id 参数...');
+                        const commentData2 = {
+                            content: commentData.content,
+                            author_id: 2  // 使用author_id而不是user_id  
+                        };
+                        
+                        const response2 = await fetch(`/api/comments/post/${postId}`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${authToken}`
+                            },
+                            body: JSON.stringify(commentData2)
+                        });
+                        
+                        if (response2.ok) {
+                            const result2 = await response2.json();
+                            addResult(`✅ 使用author_id创建评论成功！评论ID: ${result2.comment_id || result2.id}`);
+                        } else {
+                            const error2 = await response2.text();
+                            addResult(`❌ 使用author_id也失败: ${error2}`, false);
+                        }
+                    }
+                }
+            } catch (error) {
+                addResult('❌ 创建评论错误: ' + error.message, false);
+            }
+        }
+
+        async function testDirectAPI() {
+            try {
+                addResult('🔍 开始直接API测试...');
+                
+                // 测试单个文章获取
+                const postResponse = await fetch('/api/posts/1');
+                if (postResponse.ok) {
+                    const post = await postResponse.json();
+                    addResult(`✅ 单个文章API正常: "${post.title}"`);
+                } else {
+                    addResult('❌ 单个文章API失败', false);
+                }
+                
+                // 测试服务健康检查
+                const services = ['users', 'posts', 'comments'];
+                for (const service of services) {
+                    const healthResponse = await fetch(`/api/${service}/health`);
+                    if (healthResponse.ok) {
+                        addResult(`✅ ${service}服务健康检查通过`);
+                    } else {
+                        addResult(`❌ ${service}服务健康检查失败`, false);
+                    }
+                }
+                
+                // 测试API网关状态
+                const gatewayResponse = await fetch('/api/simple-status');
+                if (gatewayResponse.ok) {
+                    const status = await gatewayResponse.json();
+                    addResult(`✅ API网关状态: ${status.status}`);
+                } else {
+                    addResult('❌ API网关状态检查失败', false);
+                }
+                
+            } catch (error) {
+                addResult('❌ 直接API测试错误: ' + error.message, false);
+            }
+        }
+
+        // 页面加载时检查服务状态
+        document.addEventListener('DOMContentLoaded', function() {
+            checkServices();
+            setInterval(checkServices, 30000); // 每30秒检查一次
+        });
+    </script>
+</body>
+</html>

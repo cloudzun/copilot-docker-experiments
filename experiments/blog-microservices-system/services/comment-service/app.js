@@ -1,9 +1,30 @@
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.PORT || 3003;
+
+// JWT密钥 (应该与user服务保持一致)
+const JWT_SECRET = process.env.JWT_SECRET || 'user-service-microservices-secret-key-2024';
+
+// 验证JWT令牌的中间件
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
 
 // 中间件
 app.use(cors());
@@ -85,22 +106,22 @@ app.get('/post/:postId', async (req, res) => {
       });
     }
     
-    // 获取评论 (包含嵌套回复)
-    const [comments] = await pool.execute(`
+    // 获取评论 (包含嵌套回复) - 使用字符串模板避免参数问题
+    const [comments] = await pool.query(`
       SELECT c.id, c.content, c.created_at, c.parent_id, c.status,
              u.id as user_id, u.username, u.display_name as author_name,
              u.email as author_email
       FROM comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.post_id = ? AND c.status = 'approved'
+      JOIN users u ON c.author_id = u.id
+      WHERE c.post_id = ${parseInt(postId)} AND c.status = 'approved'
       ORDER BY c.parent_id ASC, c.created_at ASC
-      LIMIT ? OFFSET ?
-    `, [postId, limit, offset]);
+      LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    `);
     
     // 获取评论总数
     const [countResult] = await pool.execute(
       'SELECT COUNT(*) as total FROM comments WHERE post_id = ? AND status = "approved"',
-      [postId]
+      [parseInt(postId)]
     );
     const total = countResult[0].total;
     
@@ -150,20 +171,23 @@ app.get('/post/:postId', async (req, res) => {
 });
 
 // 发布新评论
-app.post('/post/:postId', async (req, res) => {
+app.post('/post/:postId', verifyToken, async (req, res) => {
   try {
     const postId = parseInt(req.params.postId);
-    const { content, user_id, parent_id } = req.body;
+    const { content, parent_id } = req.body;
+    
+    // 从JWT token中获取用户信息
+    const user_id = req.user.id;
     
     // 输入验证
     if (!postId || postId <= 0) {
       return res.status(400).json({ error: 'Invalid post ID' });
     }
     
-    if (!content || !user_id) {
+    if (!content) {
       return res.status(400).json({ 
-        error: 'Content and user_id are required',
-        details: 'Both content and user_id must be provided'
+        error: 'Content is required',
+        details: 'Comment content must be provided'
       });
     }
     
@@ -222,7 +246,7 @@ app.post('/post/:postId', async (req, res) => {
     
     // 插入评论
     const [result] = await pool.execute(
-      'INSERT INTO comments (post_id, user_id, content, parent_id, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+      'INSERT INTO comments (post_id, author_id, content, parent_id, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
       [postId, user_id, content.trim(), parent_id || null, 'approved']
     );
     
@@ -306,7 +330,7 @@ app.delete('/:commentId', async (req, res) => {
     
     // 检查评论是否存在
     const [commentCheck] = await pool.execute(
-      'SELECT id, user_id FROM comments WHERE id = ?',
+      'SELECT id, author_id FROM comments WHERE id = ?',
       [commentId]
     );
     
@@ -353,14 +377,14 @@ app.get('/user/:userId', async (req, res) => {
              u.username, u.display_name as author_name
       FROM comments c
       JOIN posts p ON c.post_id = p.id
-      JOIN users u ON c.user_id = u.id
-      WHERE c.user_id = ? AND c.status = 'approved'
+      JOIN users u ON c.author_id = u.id
+      WHERE c.author_id = ? AND c.status = 'approved'
       ORDER BY c.created_at DESC
       LIMIT ? OFFSET ?
     `, [userId, limit, offset]);
     
     const [countResult] = await pool.execute(
-      'SELECT COUNT(*) as total FROM comments WHERE user_id = ? AND status = "approved"',
+      'SELECT COUNT(*) as total FROM comments WHERE author_id = ? AND status = "approved"',
       [userId]
     );
     const total = countResult[0].total;
@@ -393,7 +417,7 @@ app.get('/stats/summary', async (req, res) => {
       'SELECT COUNT(*) as count FROM comments WHERE status = "approved" AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)'
     );
     const [activeUsers] = await pool.execute(
-      'SELECT COUNT(DISTINCT user_id) as count FROM comments WHERE status = "approved" AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
+      'SELECT COUNT(DISTINCT author_id) as count FROM comments WHERE status = "approved" AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)'
     );
     
     res.json({

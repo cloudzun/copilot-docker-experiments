@@ -2,9 +2,30 @@ const express = require('express');
 const mysql = require('mysql2/promise');
 const redis = require('redis');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.PORT || 3002;
+
+// JWT密钥 (应该与user服务保持一致)
+const JWT_SECRET = process.env.JWT_SECRET || 'user-service-microservices-secret-key-2024';
+
+// 验证JWT令牌的中间件
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
 
 // 中间件
 app.use(cors());
@@ -96,6 +117,8 @@ app.get('/', async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
     
+    console.log(`📖 Fetching posts: page=${page}, limit=${limit}, offset=${offset}`);
+    
     // 缓存键
     const cacheKey = `posts:list:page:${page}:limit:${limit}`;
     
@@ -112,17 +135,15 @@ app.get('/', async (req, res) => {
       }
     }
     
-    // 从数据库获取
-    const [rows] = await pool.execute(`
-      SELECT p.id, p.title, p.content, p.author, p.created_at, p.status,
-             p.author_id, u.username as author_username, 
-             u.display_name as author_display_name
+    // 从数据库获取 - 使用字符串模板避免参数问题  
+    console.log('Executing query with params:', [parseInt(limit), parseInt(offset)]);
+    const [rows] = await pool.query(`
+      SELECT p.id, p.title, p.content, p.author, p.created_at, p.status
       FROM posts p 
-      LEFT JOIN users u ON p.author_id = u.id
       WHERE p.status = 'published'
       ORDER BY p.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [limit, offset]);
+      LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}
+    `);
     
     // 获取总数
     const [countResult] = await pool.execute(
@@ -228,9 +249,13 @@ app.get('/:id', async (req, res) => {
 });
 
 // 创建新文章 (支持作者选择)
-app.post('/', async (req, res) => {
+app.post('/', verifyToken, async (req, res) => {
   try {
-    const { title, content, author, author_id, status = 'published' } = req.body;
+    const { title, content, status = 'published' } = req.body;
+    
+    // 从JWT token中获取用户信息
+    const author_id = req.user.id;
+    const author = req.user.username || req.user.display_name || 'Anonymous';
     
     // 输入验证
     if (!title || !content) {
@@ -244,28 +269,12 @@ app.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Title must be less than 255 characters' });
     }
     
-    // 验证作者ID是否存在
-    let validAuthorId = author_id || 1;
-    if (author_id && author_id !== 1) {
-      const [authorCheck] = await pool.execute(
-        'SELECT id FROM users WHERE id = ?', 
-        [author_id]
-      );
-      
-      if (authorCheck.length === 0) {
-        return res.status(400).json({ 
-          error: 'Invalid author ID',
-          details: 'The specified author does not exist'
-        });
-      }
-    }
-    
     const [result] = await pool.execute(
       'INSERT INTO posts (title, content, author, author_id, created_at, status) VALUES (?, ?, ?, ?, NOW(), ?)',
-      [title, content, author || 'Anonymous', validAuthorId, status]
+      [title, content, author, author_id, status]
     );
     
-    console.log(`📝 New post created: "${title}" by author ID ${validAuthorId} (Post ID: ${result.insertId})`);
+    console.log(`📝 New post created: "${title}" by ${author} (ID: ${author_id}, Post ID: ${result.insertId})`);
     
     // 清理相关缓存
     if (redisClient && redisClient.isOpen) {
@@ -284,8 +293,8 @@ app.post('/', async (req, res) => {
     res.status(201).json({ 
       id: result.insertId,
       title,
-      author: author || 'Anonymous',
-      author_id: validAuthorId,
+      author: author,
+      author_id: author_id,
       status,
       message: 'Post created successfully',
       created_at: new Date().toISOString()
