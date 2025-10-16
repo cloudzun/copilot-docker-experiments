@@ -1,0 +1,41 @@
+[mysqld]
+# 生产环境MySQL主库配置
+
+# 服务器标识
+server-id = 1
+log-bin = mysql-bin
+binlog-format = ROW
+binlog-do-db = blog_system
+expire_logs_days = 7
+
+# 性能优化
+innodb_buffer_pool_size = 1G
+innodb_log_file_size = 256M
+innodb_flush_log_at_trx_commit = 1
+innodb_file_per_table = 1
+innodb_open_files = 4000
+
+# 连接设置
+max_connections = 500
+max_connect_errors = 999999
+interactive_timeout = 28800
+wait_timeout = 28800
+
+# 查询缓存
+query_cache_type = 1
+query_cache_size = 128M
+query_cache_limit = 4M
+
+# 慢查询日志
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 2
+log_queries_not_using_indexes = 1
+
+# 字符集
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# 安全设置
+skip-name-resolve
+local-infile = 0

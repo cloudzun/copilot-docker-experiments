@@ -1,0 +1,135 @@
+version: '3.3'
+
+services:
+  # API网关
+  api-gateway:
+    image: nginx:alpine
+    container_name: blog-microservices-gateway
+    ports:
+      - "8086:80"
+      - "8087:8080"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./gateway/nginx-simple.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - user-service
+      - post-service
+      - comment-service
+    restart: unless-stopped
+    networks:
+      - microservices-network
+
+  # 用户服务
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: blog-microservices-user
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - JWT_SECRET=microservices-jwt-secret-key-2024-module5
+      - NODE_ENV=production
+      - PORT=3001
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+
+  # 文章服务
+  post-service:
+    build:
+      context: ./services/post-service
+      dockerfile: Dockerfile
+    container_name: blog-microservices-post
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - REDIS_HOST=cache
+      - JWT_SECRET=microservices-jwt-secret-key-2024-module5
+      - NODE_ENV=production
+      - PORT=3002
+    depends_on:
+      - database
+      - cache
+    restart: unless-stopped
+    networks:
+      - microservices-network
+
+  # 评论服务
+  comment-service:
+    build:
+      context: ./services/comment-service
+      dockerfile: Dockerfile
+    container_name: blog-microservices-comment
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=secret123
+      - JWT_SECRET=microservices-jwt-secret-key-2024-module5
+      - NODE_ENV=production
+      - PORT=3003
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+
+  # 数据库服务
+  database:
+    image: mysql:8.0
+    container_name: blog-microservices-database
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=blog_system
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=secret123
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+      - ./mysql.cnf:/etc/mysql/conf.d/mysql.cnf
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    ports:
+      - "3308:3306"
+
+  # 缓存服务
+  cache:
+    image: redis:7-alpine
+    container_name: blog-microservices-cache
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    ports:
+      - "6382:6379"
+
+  # 数据库管理工具
+  adminer:
+    image: adminer:latest
+    container_name: blog-microservices-adminer
+    ports:
+      - "8088:8080"
+    depends_on:
+      - database
+    restart: unless-stopped
+    networks:
+      - microservices-network
+    environment:
+      - ADMINER_DEFAULT_SERVER=database
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  microservices-network:
+    driver: bridge

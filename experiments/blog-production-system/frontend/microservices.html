@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微服务博客系统 - Module 5 实践</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --success-color: #16a34a;
+            --warning-color: #d97706;
+            --error-color: #dc2626;
+            --background-color: #f8fafc;
+            --card-background: #ffffff;
+            --border-color: #e2e8f0;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* 导航栏 */
+        .navbar {
+            background: var(--card-background);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .nav-button {
+            background: none;
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .nav-button:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .nav-button.primary {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* 用户状态 */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: white;
+        }
+
+        .status-logged-in {
+            background: var(--success-color);
+        }
+
+        .status-logged-out {
+            background: var(--secondary-color);
+        }
+
+        /* 主要内容区域 */
+        .main-content {
+            padding: 2rem 0;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 0.5rem;
+        }
+
+        /* 微服务状态面板 */
+        .services-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .service-card {
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .service-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .service-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .service-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .status-healthy {
+            background: #dcfce7;
+            color: var(--success-color);
+        }
+
+        .status-unhealthy {
+            background: #fecaca;
+            color: var(--error-color);
+        }
+
+        .status-checking {
+            background: #fef3c7;
+            color: var(--warning-color);
+        }
+
+        .service-details {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* 卡片布局 */
+        .card {
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-right: 0.5rem;
+        }
+
+        .button:hover {
+            background: #1d4ed8;
+        }
+
+        .button.secondary {
+            background: var(--secondary-color);
+        }
+
+        .button.secondary:hover {
+            background: #475569;
+        }
+
+        .button.danger {
+            background: var(--error-color);
+        }
+
+        .button.danger:hover {
+            background: #b91c1c;
+        }
+
+        /* 文章列表 */
+        .post-item {
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 0;
+        }
+
+        .post-item:last-child {
+            border-bottom: none;
+        }
+
+        .post-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .post-title:hover {
+            text-decoration: underline;
+        }
+
+        .post-meta {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .post-content {
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* 评论区域 */
+        .comments-section {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .comment-item {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border-radius: 6px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .comment-item.reply {
+            margin-left: 2rem;
+            border-left-color: var(--secondary-color);
+        }
+
+        .comment-author {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .comment-content {
+            margin-bottom: 0.5rem;
+        }
+
+        .comment-actions {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .comment-action {
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .comment-action:hover {
+            color: var(--primary-color);
+        }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--card-background);
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        /* 消息提示 */
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            border: 1px solid;
+        }
+
+        .alert.success {
+            background: #dcfce7;
+            border-color: #bbf7d0;
+            color: var(--success-color);
+        }
+
+        .alert.error {
+            background: #fecaca;
+            border-color: #fca5a5;
+            color: var(--error-color);
+        }
+
+        .alert.warning {
+            background: #fef3c7;
+            border-color: #fde68a;
+            color: var(--warning-color);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 15px;
+            }
+
+            .nav-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .services-status {
+                grid-template-columns: 1fr;
+            }
+
+            .comment-item.reply {
+                margin-left: 1rem;
+            }
+
+            .post-meta {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+
+        /* 加载动画 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 隐藏元素 */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-content">
+                <div class="logo">🔬 Module 5 微服务博客</div>
+                <div class="nav-links">
+                    <div class="user-info">
+                        <span id="userStatus" class="status-badge status-logged-out">未登录</span>
+                        <span id="username" class="hidden"></span>
+                    </div>
+                    <button id="loginBtn" class="nav-button primary">登录</button>
+                    <button id="registerBtn" class="nav-button">注册</button>
+                    <button id="logoutBtn" class="nav-button hidden">退出</button>
+                    <button id="refreshBtn" class="nav-button">🔄 刷新状态</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主要内容 -->
+    <main class="main-content">
+        <div class="container">
+            <!-- 微服务状态监控 -->
+            <section class="section">
+                <h2 class="section-title">🔧 微服务状态监控</h2>
+                <div class="services-status">
+                    <div class="service-card">
+                        <div class="service-header">
+                            <span class="service-name">API网关</span>
+                            <span id="gatewayStatus" class="service-status status-checking">检查中</span>
+                        </div>
+                        <div class="service-details">
+                            <div>端口: 8086 (主要) / 8087 (管理)</div>
+                            <div>功能: 请求路由，负载均衡</div>
+                            <div id="gatewayHealth">健康状态: 检查中...</div>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <div class="service-header">
+                            <span class="service-name">用户服务</span>
+                            <span id="userServiceStatus" class="service-status status-checking">检查中</span>
+                        </div>
+                        <div class="service-details">
+                            <div>端口: 3001</div>
+                            <div>功能: 注册，登录，JWT认证</div>
+                            <div id="userServiceHealth">健康状态: 检查中...</div>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <div class="service-header">
+                            <span class="service-name">文章服务</span>
+                            <span id="postServiceStatus" class="service-status status-checking">检查中</span>
+                        </div>
+                        <div class="service-details">
+                            <div>端口: 3002</div>
+                            <div>功能: 文章CRUD，缓存，搜索</div>
+                            <div id="postServiceHealth">健康状态: 检查中...</div>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <div class="service-header">
+                            <span class="service-name">评论服务</span>
+                            <span id="commentServiceStatus" class="service-status status-checking">检查中</span>
+                        </div>
+                        <div class="service-details">
+                            <div>端口: 3003</div>
+                            <div>功能: 评论管理，多级回复</div>
+                            <div id="commentServiceHealth">健康状态: 检查中...</div>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <div class="service-header">
+                            <span class="service-name">数据库</span>
+                            <span id="databaseStatus" class="service-status status-checking">检查中</span>
+                        </div>
+                        <div class="service-details">
+                            <div>类型: MySQL 8.0</div>
+                            <div>端口: 3308</div>
+                            <div>管理: Adminer (8088)</div>
+                        </div>
+                    </div>
+
+                    <div class="service-card">
+                        <div class="service-header">
+                            <span class="service-name">缓存</span>
+                            <span id="cacheStatus" class="service-status status-checking">检查中</span>
+                        </div>
+                        <div class="service-details">
+                            <div>类型: Redis 7</div>
+                            <div>端口: 6382</div>
+                            <div>功能: 文章缓存，会话存储</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 用户认证区域 -->
+            <section class="section" id="authSection">
+                <h2 class="section-title">👤 用户认证功能</h2>
+                <div class="card">
+                    <div class="card-title">快速登录测试</div>
+                    <p>使用以下测试账户快速体验系统功能：</p>
+                    <div style="margin: 1rem 0; padding: 1rem; background: #f8fafc; border-radius: 6px;">
+                        <strong>测试账户:</strong><br>
+                        用户名: testuser<br>
+                        密码: 123456
+                    </div>
+                    <button id="quickLoginBtn" class="button">快速登录</button>
+                    <button id="createTestUserBtn" class="button secondary">创建测试用户</button>
+                </div>
+            </section>
+
+            <!-- 文章管理区域 -->
+            <section class="section">
+                <h2 class="section-title">📝 文章管理</h2>
+                
+                <!-- 发布新文章 -->
+                <div class="card" id="newPostSection">
+                    <div class="card-title">发布新文章</div>
+                    <div id="authRequired" class="alert warning">
+                        ⚠️ 需要登录后才能发布文章
+                    </div>
+                    <form id="newPostForm" class="hidden">
+                        <div class="form-group">
+                            <label class="form-label">文章标题</label>
+                            <input type="text" id="postTitle" class="form-input" placeholder="输入文章标题" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">文章内容</label>
+                            <textarea id="postContent" class="form-input form-textarea" placeholder="输入文章内容" required></textarea>
+                        </div>
+                        <button type="submit" class="button">发布文章</button>
+                        <button type="button" id="cancelPostBtn" class="button secondary">取消</button>
+                    </form>
+                </div>
+
+                <!-- 文章列表 -->
+                <div class="card">
+                    <div class="card-title">
+                        文章列表
+                        <button id="loadPostsBtn" class="button secondary" style="float: right;">刷新列表</button>
+                    </div>
+                    <div id="postsContainer">
+                        <div class="loading" style="margin: 2rem auto; display: block;"></div>
+                        <p style="text-align: center; margin-top: 1rem;">正在加载文章...</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- 登录模态框 -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">用户登录</h3>
+                <button class="close-button" onclick="closeModal('loginModal')">&times;</button>
+            </div>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label class="form-label">用户名</label>
+                    <input type="text" id="loginUsername" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">密码</label>
+                    <input type="password" id="loginPassword" class="form-input" required>
+                </div>
+                <div id="loginMessage"></div>
+                <button type="submit" class="button">登录</button>
+                <button type="button" class="button secondary" onclick="closeModal('loginModal')">取消</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 注册模态框 -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">用户注册</h3>
+                <button class="close-button" onclick="closeModal('registerModal')">&times;</button>
+            </div>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label class="form-label">用户名</label>
+                    <input type="text" id="registerUsername" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">邮箱</label>
+                    <input type="email" id="registerEmail" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">密码</label>
+                    <input type="password" id="registerPassword" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">确认密码</label>
+                    <input type="password" id="confirmPassword" class="form-input" required>
+                </div>
+                <div id="registerMessage"></div>
+                <button type="submit" class="button">注册</button>
+                <button type="button" class="button secondary" onclick="closeModal('registerModal')">取消</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 文章详情模态框 -->
+    <div id="postDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 class="modal-title">文章详情</h3>
+                <button class="close-button" onclick="closeModal('postDetailModal')">&times;</button>
+            </div>
+            <div id="postDetailContent">
+                <div class="loading"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态管理
+        const appState = {
+            user: null,
+            token: localStorage.getItem('authToken'),
+            services: {
+                gateway: { status: 'checking', health: null },
+                userService: { status: 'checking', health: null },
+                postService: { status: 'checking', health: null },
+                commentService: { status: 'checking', health: null },
+                database: { status: 'checking', health: null },
+                cache: { status: 'checking', health: null }
+            }
+        };
+
+        // API 基础URL
+        const API_BASE = '/api';
+
+        // 工具函数
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert ${type}`;
+            alertDiv.textContent = message;
+            
+            const container = document.querySelector('.container');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.add('show');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('show');
+            // 清空表单
+            const modal = document.getElementById(modalId);
+            const form = modal.querySelector('form');
+            if (form) {
+                form.reset();
+                const messageDiv = modal.querySelector('[id$="Message"]');
+                if (messageDiv) messageDiv.innerHTML = '';
+            }
+        }
+
+        // HTTP请求工具
+        async function apiRequest(url, options = {}) {
+            const config = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                },
+                ...options
+            };
+
+            if (appState.token) {
+                config.headers.Authorization = `Bearer ${appState.token}`;
+            }
+
+            try {
+                const response = await fetch(API_BASE + url, config);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || '请求失败');
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('API请求错误:', error);
+                throw error;
+            }
+        }
+
+        // 检查微服务状态
+        async function checkServicesHealth() {
+            const services = ['gateway', 'userService', 'postService', 'commentService'];
+            
+            for (const service of services) {
+                try {
+                    let endpoint;
+                    switch (service) {
+                        case 'gateway':
+                            endpoint = '/simple-status';
+                            break;
+                        case 'userService':
+                            endpoint = '/users/health';
+                            break;
+                        case 'postService':
+                            endpoint = '/posts/health';
+                            break;
+                        case 'commentService':
+                            endpoint = '/comments/health';
+                            break;
+                    }
+
+                    const response = await fetch(API_BASE + endpoint);
+                    const isHealthy = response.ok;
+                    
+                    updateServiceStatus(service, isHealthy ? 'healthy' : 'unhealthy');
+                } catch (error) {
+                    updateServiceStatus(service, 'unhealthy');
+                }
+            }
+
+            // 检查数据库和缓存状态（通过其他服务间接检查）
+            try {
+                await apiRequest('/posts/health');
+                updateServiceStatus('database', 'healthy');
+                updateServiceStatus('cache', 'healthy');
+            } catch (error) {
+                updateServiceStatus('database', 'unhealthy');
+                updateServiceStatus('cache', 'unhealthy');
+            }
+        }
+
+        function updateServiceStatus(service, status) {
+            const statusElement = document.getElementById(service + 'Status');
+            const healthElement = document.getElementById(service + 'Health');
+            
+            if (statusElement) {
+                statusElement.className = `service-status status-${status}`;
+                statusElement.textContent = status === 'healthy' ? '正常' : status === 'unhealthy' ? '异常' : '检查中';
+            }
+            
+            if (healthElement) {
+                const timestamp = new Date().toLocaleTimeString();
+                healthElement.textContent = `健康状态: ${status === 'healthy' ? '✅ 正常' : status === 'unhealthy' ? '❌ 异常' : '🔄 检查中'} (${timestamp})`;
+            }
+        }
+
+        // 用户认证相关
+        function updateUserUI() {
+            const isLoggedIn = !!appState.token;
+            
+            document.getElementById('userStatus').className = `status-badge ${isLoggedIn ? 'status-logged-in' : 'status-logged-out'}`;
+            document.getElementById('userStatus').textContent = isLoggedIn ? '已登录' : '未登录';
+            
+            document.getElementById('username').textContent = appState.user ? appState.user.username : '';
+            document.getElementById('username').classList.toggle('hidden', !isLoggedIn);
+            
+            document.getElementById('loginBtn').classList.toggle('hidden', isLoggedIn);
+            document.getElementById('registerBtn').classList.toggle('hidden', isLoggedIn);
+            document.getElementById('logoutBtn').classList.toggle('hidden', !isLoggedIn);
+            
+            document.getElementById('authRequired').classList.toggle('hidden', isLoggedIn);
+            document.getElementById('newPostForm').classList.toggle('hidden', !isLoggedIn);
+        }
+
+        async function login(username, password) {
+            try {
+                const data = await apiRequest('/users/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password })
+                });
+                
+                appState.token = data.token;
+                appState.user = data.user;
+                localStorage.setItem('authToken', data.token);
+                
+                updateUserUI();
+                closeModal('loginModal');
+                showAlert('登录成功！');
+                loadPosts();
+            } catch (error) {
+                document.getElementById('loginMessage').innerHTML = `<div class="alert error">${error.message}</div>`;
+            }
+        }
+
+        async function register(username, email, password) {
+            try {
+                await apiRequest('/users/register', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                closeModal('registerModal');
+                showAlert('注册成功！请登录。');
+            } catch (error) {
+                document.getElementById('registerMessage').innerHTML = `<div class="alert error">${error.message}</div>`;
+            }
+        }
+
+        function logout() {
+            appState.token = null;
+            appState.user = null;
+            localStorage.removeItem('authToken');
+            updateUserUI();
+            showAlert('已退出登录');
+        }
+
+        // 快速登录和创建测试用户
+        async function quickLogin() {
+            await login('testuser', '123456');
+        }
+
+        async function createTestUser() {
+            try {
+                await register('testuser', 'test@example.com', '123456');
+                showAlert('测试用户创建成功！');
+            } catch (error) {
+                if (error.message.includes('已存在')) {
+                    showAlert('测试用户已存在，可以直接登录', 'warning');
+                } else {
+                    showAlert('创建测试用户失败: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // 文章管理
+        async function loadPosts() {
+            const container = document.getElementById('postsContainer');
+            container.innerHTML = '<div class="loading" style="margin: 2rem auto; display: block;"></div><p style="text-align: center; margin-top: 1rem;">正在加载文章...</p>';
+            
+            try {
+                const data = await apiRequest('/posts');
+                displayPosts(data.posts || []);
+            } catch (error) {
+                container.innerHTML = `<div class="alert error">加载文章失败: ${error.message}</div>`;
+            }
+        }
+
+        function displayPosts(posts) {
+            const container = document.getElementById('postsContainer');
+            
+            if (posts.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #64748b;">暂无文章</p>';
+                return;
+            }
+            
+            container.innerHTML = posts.map(post => `
+                <div class="post-item">
+                    <h3 class="post-title" onclick="viewPost(${post.id})">${post.title}</h3>
+                    <div class="post-meta">
+                        <span>👤 ${post.author_name || '匿名用户'}</span>
+                        <span>📅 ${new Date(post.created_at).toLocaleString()}</span>
+                        <span>👁️ ${post.views || 0} 次浏览</span>
+                    </div>
+                    <div class="post-content">${post.content.substring(0, 150)}${post.content.length > 150 ? '...' : ''}</div>
+                    <div class="post-actions">
+                        <button class="button secondary" onclick="viewPost(${post.id})">查看详情</button>
+                        <button class="button secondary" onclick="loadComments(${post.id})">评论 (${post.comment_count || 0})</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function createPost(title, content) {
+            try {
+                await apiRequest('/posts', {
+                    method: 'POST',
+                    body: JSON.stringify({ title, content })
+                });
+                
+                document.getElementById('newPostForm').reset();
+                showAlert('文章发布成功！');
+                loadPosts();
+            } catch (error) {
+                showAlert('发布失败: ' + error.message, 'error');
+            }
+        }
+
+        async function viewPost(postId) {
+            const modal = document.getElementById('postDetailModal');
+            const content = document.getElementById('postDetailContent');
+            
+            content.innerHTML = '<div class="loading"></div><p>正在加载文章...</p>';
+            showModal('postDetailModal');
+            
+            try {
+                const post = await apiRequest(`/posts/${postId}`);
+                const comments = await apiRequest(`/comments/post/${postId}`);
+                
+                content.innerHTML = `
+                    <div class="post-detail">
+                        <h2>${post.title}</h2>
+                        <div class="post-meta" style="margin: 1rem 0;">
+                            <span>👤 ${post.author_name || '匿名用户'}</span>
+                            <span>📅 ${new Date(post.created_at).toLocaleString()}</span>
+                            <span>👁️ ${post.views || 0} 次浏览</span>
+                        </div>
+                        <div class="post-content" style="white-space: pre-wrap; margin: 2rem 0;">${post.content}</div>
+                        
+                        <div class="comments-section">
+                            <h3>评论 (${comments.length})</h3>
+                            ${appState.token ? `
+                                <form id="commentForm" style="margin: 1rem 0;">
+                                    <div class="form-group">
+                                        <textarea id="commentContent" class="form-input form-textarea" placeholder="写下你的评论..." required></textarea>
+                                    </div>
+                                    <button type="submit" class="button">发表评论</button>
+                                </form>
+                            ` : '<div class="alert warning">请登录后发表评论</div>'}
+                            
+                            <div id="commentsList">
+                                ${comments.map(comment => `
+                                    <div class="comment-item">
+                                        <div class="comment-author">${comment.author_name || '匿名用户'}</div>
+                                        <div class="comment-content">${comment.content}</div>
+                                        <div class="comment-actions">
+                                            <span>${new Date(comment.created_at).toLocaleString()}</span>
+                                            ${comment.status === 'pending' ? '<span style="color: #d97706;">待审核</span>' : ''}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // 绑定评论表单事件
+                const commentForm = document.getElementById('commentForm');
+                if (commentForm) {
+                    commentForm.onsubmit = async (e) => {
+                        e.preventDefault();
+                        const content = document.getElementById('commentContent').value;
+                        await createComment(postId, content);
+                        document.getElementById('commentContent').value = '';
+                        viewPost(postId); // 重新加载
+                    };
+                }
+            } catch (error) {
+                content.innerHTML = `<div class="alert error">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        async function createComment(postId, content) {
+            try {
+                await apiRequest('/comments', {
+                    method: 'POST',
+                    body: JSON.stringify({ post_id: postId, content })
+                });
+                showAlert('评论发表成功！');
+            } catch (error) {
+                showAlert('评论发表失败: ' + error.message, 'error');
+            }
+        }
+
+        // 事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化
+            updateUserUI();
+            checkServicesHealth();
+            loadPosts();
+            
+            // 导航栏事件
+            document.getElementById('loginBtn').onclick = () => showModal('loginModal');
+            document.getElementById('registerBtn').onclick = () => showModal('registerModal');
+            document.getElementById('logoutBtn').onclick = logout;
+            document.getElementById('refreshBtn').onclick = checkServicesHealth;
+            
+            // 快速操作
+            document.getElementById('quickLoginBtn').onclick = quickLogin;
+            document.getElementById('createTestUserBtn').onclick = createTestUser;
+            
+            // 文章相关
+            document.getElementById('loadPostsBtn').onclick = loadPosts;
+            document.getElementById('cancelPostBtn').onclick = () => {
+                document.getElementById('newPostForm').reset();
+            };
+            
+            // 表单提交
+            document.getElementById('loginForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('loginUsername').value;
+                const password = document.getElementById('loginPassword').value;
+                await login(username, password);
+            };
+            
+            document.getElementById('registerForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const username = document.getElementById('registerUsername').value;
+                const email = document.getElementById('registerEmail').value;
+                const password = document.getElementById('registerPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                if (password !== confirmPassword) {
+                    document.getElementById('registerMessage').innerHTML = '<div class="alert error">密码确认不匹配</div>';
+                    return;
+                }
+                
+                await register(username, email, password);
+            };
+            
+            document.getElementById('newPostForm').onsubmit = async (e) => {
+                e.preventDefault();
+                const title = document.getElementById('postTitle').value;
+                const content = document.getElementById('postContent').value;
+                await createPost(title, content);
+            };
+            
+            // 模态框点击外部关闭
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal')) {
+                    e.target.classList.remove('show');
+                }
+            });
+            
+            // 定时刷新状态
+            setInterval(checkServicesHealth, 60000); // 每分钟检查一次
+        });
+    </script>
+</body>
+</html>

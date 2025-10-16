@@ -1,0 +1,517 @@
+version: '3.8'
+
+# Module 6: 生产级微服务博客系统
+# 基于 Module 5 的微服务架构，添加生产级配置和监控
+
+services:
+  # ===================
+  # 核心微服务 (基于Module 5)
+  # ===================
+  
+  # API网关 - 生产级Nginx配置
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl:ro
+      - ./frontend:/usr/share/nginx/html:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - user-service
+      - post-service
+      - comment-service
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - frontend-network
+      - backend-network
+    labels:
+      - "service=api-gateway"
+      - "environment=production"
+
+  # 用户服务 - 高可用配置
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql-master
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_HOST=redis-cluster
+      - LOG_LEVEL=info
+    depends_on:
+      - mysql-master
+      - redis-cluster
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - backend-network
+    labels:
+      - "service=user-service"
+      - "environment=production"
+
+  # 文章服务
+  post-service:
+    build:
+      context: ./services/post-service
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql-master
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis-cluster
+      - ELASTICSEARCH_HOST=elasticsearch
+      - LOG_LEVEL=info
+    depends_on:
+      - mysql-master
+      - redis-cluster
+      - elasticsearch
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - backend-network
+    labels:
+      - "service=post-service"
+      - "environment=production"
+
+  # 评论服务
+  comment-service:
+    build:
+      context: ./services/comment-service
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql-master
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis-cluster
+      - LOG_LEVEL=info
+    depends_on:
+      - mysql-master
+      - redis-cluster
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - backend-network
+    labels:
+      - "service=comment-service"
+      - "environment=production"
+
+  # ===================
+  # 数据存储层 - 高可用配置
+  # ===================
+  
+  # MySQL主库
+  mysql-master:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=blog_system
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_BINLOG_FORMAT=ROW
+      - MYSQL_SERVER_ID=1
+    volumes:
+      - mysql_master_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+      - ./infrastructure/mysql/master.cnf:/etc/mysql/conf.d/mysql.cnf
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    networks:
+      - backend-network
+    labels:
+      - "service=mysql-master"
+      - "environment=production"
+
+  # MySQL从库
+  mysql-slave:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=blog_system
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_MASTER_HOST=mysql-master
+      - MYSQL_SERVER_ID=2
+    volumes:
+      - mysql_slave_data:/var/lib/mysql
+      - ./infrastructure/mysql/slave.cnf:/etc/mysql/conf.d/mysql.cnf
+    depends_on:
+      - mysql-master
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.75'
+          memory: 768M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+    labels:
+      - "service=mysql-slave"
+      - "environment=production"
+
+  # Redis集群
+  redis-cluster:
+    image: redis:7-alpine
+    command: redis-server /etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/redis/redis.conf:/etc/redis/redis.conf
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+    labels:
+      - "service=redis-cluster"
+      - "environment=production"
+
+  # Elasticsearch (搜索功能)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+    labels:
+      - "service=elasticsearch"
+      - "environment=production"
+
+  # ===================
+  # 监控和运维 (新增)
+  # ===================
+  
+  # Prometheus 监控
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infrastructure/monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - monitoring-network
+      - backend-network
+    labels:
+      - "service=prometheus"
+      - "environment=production"
+
+  # Grafana 可视化
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/monitoring/grafana-datasources:/etc/grafana/provisioning/datasources
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - monitoring-network
+    labels:
+      - "service=grafana"
+      - "environment=production"
+
+  # Node Exporter 系统监控
+  node-exporter:
+    image: prom/node-exporter:latest
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - '/:/host:ro,rslave'
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    networks:
+      - monitoring-network
+    labels:
+      - "service=node-exporter"
+      - "environment=production"
+
+  # cAdvisor 容器监控
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    networks:
+      - monitoring-network
+    labels:
+      - "service=cadvisor"
+      - "environment=production"
+
+  # ===================
+  # 日志管理
+  # ===================
+  
+  # Elasticsearch for logs
+  elasticsearch-logs:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_logs_data:/usr/share/elasticsearch/data
+    ports:
+      - "9201:9200"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    networks:
+      - logging-network
+    labels:
+      - "service=elasticsearch-logs"
+      - "environment=production"
+
+  # Logstash
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.10.0
+    volumes:
+      - ./infrastructure/logging/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      - elasticsearch-logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    networks:
+      - logging-network
+    labels:
+      - "service=logstash"
+      - "environment=production"
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch-logs:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch-logs
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - logging-network
+    labels:
+      - "service=kibana"
+      - "environment=production"
+
+volumes:
+  mysql_master_data:
+  mysql_slave_data:
+  redis_data:
+  elasticsearch_data:
+  elasticsearch_logs_data:
+  prometheus_data:
+  grafana_data:
+  nginx_logs:
+
+networks:
+  frontend-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+  monitoring-network:
+    driver: bridge
+  logging-network:
+    driver: bridge

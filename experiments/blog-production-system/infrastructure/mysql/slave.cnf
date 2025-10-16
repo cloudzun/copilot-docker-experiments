@@ -1,0 +1,41 @@
+[mysqld]
+# 生产环境MySQL从库配置
+
+# 服务器标识
+server-id = 2
+relay-log = mysql-relay-bin
+log-slave-updates = 1
+read-only = 1
+
+# 复制配置
+slave-skip-errors = 1062,1053,1146
+
+# 性能优化 (从库可以适当降低)
+innodb_buffer_pool_size = 768M
+innodb_log_file_size = 128M
+innodb_flush_log_at_trx_commit = 2
+innodb_file_per_table = 1
+
+# 连接设置
+max_connections = 300
+max_connect_errors = 999999
+interactive_timeout = 28800
+wait_timeout = 28800
+
+# 查询缓存
+query_cache_type = 1
+query_cache_size = 64M
+query_cache_limit = 2M
+
+# 慢查询日志
+slow_query_log = 1
+slow_query_log_file = /var/log/mysql/slow.log
+long_query_time = 2
+
+# 字符集
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+
+# 安全设置
+skip-name-resolve
+local-infile = 0

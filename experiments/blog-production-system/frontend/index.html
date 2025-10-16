@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微服务博客系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .user-menu {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .user-info {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-info.show {
+            display: flex;
+        }
+
+        .auth-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .auth-buttons.hide {
+            display: none;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 1px solid white;
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: #333;
+        }
+
+        .btn-small {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 2rem 0;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Posts Section */
+        .posts-section h2 {
+            margin-bottom: 1.5rem;
+            color: #333;
+        }
+
+        .post-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .post-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .post-header {
+            margin-bottom: 1rem;
+        }
+
+        .post-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .post-meta {
+            color: #666;
+            font-size: 0.875rem;
+        }
+
+        .post-content {
+            color: #555;
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+
+        .post-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .comment-btn {
+            background: none;
+            border: none;
+            color: #007bff;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+
+        .comment-btn:hover {
+            text-decoration: underline;
+        }
+
+        /* Comments */
+        .comments-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid #eee;
+        }
+
+        .comment-form {
+            margin-bottom: 1rem;
+        }
+
+        .comment-form textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            resize: vertical;
+        }
+
+        .comment-form button {
+            margin-top: 0.5rem;
+        }
+
+        .comment {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+        }
+
+        .comment-author {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.875rem;
+        }
+
+        .comment-date {
+            color: #666;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .comment-content {
+            margin-top: 0.5rem;
+            color: #555;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .sidebar-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-card h3 {
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        /* Write Post Form */
+        .write-post-form {
+            display: none;
+        }
+
+        .write-post-form.show {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 400px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .modal-tabs {
+            display: flex;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 2px solid transparent;
+        }
+
+        .tab-btn.active {
+            color: #007bff;
+            border-bottom-color: #007bff;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Loading and Messages */
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .message {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #007bff;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🚀 微服务博客</h1>
+                </div>
+                <div class="user-menu">
+                    <div class="user-info" id="userInfo">
+                        <span>欢迎, <strong id="username"></strong></span>
+                        <button class="btn btn-small btn-secondary" onclick="logout()">退出</button>
+                    </div>
+                    <div class="auth-buttons" id="authButtons">
+                        <button class="btn btn-secondary" onclick="showAuthModal('login')">登录</button>
+                        <button class="btn btn-primary" onclick="showAuthModal('register')">注册</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <div class="content-grid">
+                <!-- Posts Section -->
+                <div class="posts-section">
+                    <h2>最新文章</h2>
+                    <div id="postsContainer">
+                        <div class="loading">正在加载文章...</div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <aside class="sidebar">
+                    <!-- Write Post -->
+                    <div class="sidebar-card">
+                        <h3>✍️ 写文章</h3>
+                        <div id="writePostAuth" class="message">
+                            请先<a href="#" onclick="showAuthModal('login')">登录</a>后发表文章
+                        </div>
+                        <div class="write-post-form" id="writePostForm">
+                            <form id="postForm">
+                                <div class="form-group">
+                                    <label for="postTitle">标题</label>
+                                    <input type="text" id="postTitle" placeholder="输入文章标题" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="postContent">内容</label>
+                                    <textarea id="postContent" placeholder="分享你的想法..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">发布文章</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="sidebar-card">
+                        <h3>📊 统计</h3>
+                        <div class="stats" id="statsContainer">
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalPosts">-</div>
+                                <div class="stat-label">文章</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalComments">-</div>
+                                <div class="stat-label">评论</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" id="totalUsers">-</div>
+                                <div class="stat-label">用户</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Link -->
+                    <div class="sidebar-card">
+                        <h3>🔧 管理</h3>
+                        <p>系统管理员可以查看：</p>
+                        <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                            <li><a href="/demo.html" target="_blank">系统监控面板</a></li>
+                            <li><a href="http://localhost:8088" target="_blank">数据库管理</a></li>
+                        </ul>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </main>
+
+    <!-- Auth Modal -->
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">用户认证</h2>
+                <button class="close-btn" onclick="hideAuthModal()">&times;</button>
+            </div>
+            
+            <div class="modal-tabs">
+                <button class="tab-btn active" onclick="switchTab('login')">登录</button>
+                <button class="tab-btn" onclick="switchTab('register')">注册</button>
+            </div>
+
+            <!-- Login Form -->
+            <div class="tab-content active" id="loginTab">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginUsername">用户名</label>
+                        <input type="text" id="loginUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">密码</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">登录</button>
+                </form>
+            </div>
+
+            <!-- Register Form -->
+            <div class="tab-content" id="registerTab">
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="registerUsername">用户名</label>
+                        <input type="text" id="registerUsername" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail">邮箱</label>
+                        <input type="email" id="registerEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">密码</label>
+                        <input type="password" id="registerPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="registerDisplayName">显示名称</label>
+                        <input type="text" id="registerDisplayName" placeholder="可选">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">注册</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentUser = null;
+        let authToken = null;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthStatus();
+            loadPosts();
+            loadStats();
+            setupEventListeners();
+        });
+
+        function setupEventListeners() {
+            // Post form
+            document.getElementById('postForm').addEventListener('submit', handlePostSubmit);
+            
+            // Auth forms
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('registerForm').addEventListener('submit', handleRegister);
+            
+            // Close modal on outside click
+            document.getElementById('authModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hideAuthModal();
+                }
+            });
+        }
+
+        // Auth functions
+        function checkAuthStatus() {
+            authToken = localStorage.getItem('authToken');
+            const userData = localStorage.getItem('userData');
+            
+            if (authToken && userData) {
+                currentUser = JSON.parse(userData);
+                updateUIForLoggedInUser();
+            } else {
+                updateUIForLoggedOutUser();
+            }
+        }
+
+        function updateUIForLoggedInUser() {
+            document.getElementById('username').textContent = currentUser.username;
+            document.getElementById('userInfo').classList.add('show');
+            document.getElementById('authButtons').classList.add('hide');
+            document.getElementById('writePostAuth').style.display = 'none';
+            document.getElementById('writePostForm').classList.add('show');
+        }
+
+        function updateUIForLoggedOutUser() {
+            document.getElementById('userInfo').classList.remove('show');
+            document.getElementById('authButtons').classList.remove('hide');
+            document.getElementById('writePostAuth').style.display = 'block';
+            document.getElementById('writePostForm').classList.remove('show');
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const response = await fetch('/api/users/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    authToken = data.token;
+                    currentUser = data.user;
+                    
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('userData', JSON.stringify(currentUser));
+                    
+                    hideAuthModal();
+                    updateUIForLoggedInUser();
+                    showMessage('登录成功！', 'success');
+                } else {
+                    const error = await response.json();
+                    showMessage('登录失败: ' + error.message, 'error');
+                }
+            } catch (error) {
+                showMessage('登录失败: ' + error.message, 'error');
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const display_name = document.getElementById('registerDisplayName').value || username;
+
+            try {
+                const response = await fetch('/api/users/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password, display_name })
+                });
+
+                if (response.ok) {
+                    showMessage('注册成功！请登录', 'success');
+                    switchTab('login');
+                    document.getElementById('registerForm').reset();
+                } else {
+                    const error = await response.json();
+                    showMessage('注册失败: ' + error.message, 'error');
+                }
+            } catch (error) {
+                showMessage('注册失败: ' + error.message, 'error');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('userData');
+            authToken = null;
+            currentUser = null;
+            updateUIForLoggedOutUser();
+            showMessage('已退出登录', 'success');
+        }
+
+        // Modal functions
+        function showAuthModal(tab = 'login') {
+            document.getElementById('authModal').classList.add('show');
+            switchTab(tab);
+        }
+
+        function hideAuthModal() {
+            document.getElementById('authModal').classList.remove('show');
+        }
+
+        function switchTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tab + 'Tab').classList.add('active');
+        }
+
+        // Post functions
+        async function handlePostSubmit(e) {
+            e.preventDefault();
+            if (!authToken) {
+                showMessage('请先登录', 'error');
+                return;
+            }
+
+            const title = document.getElementById('postTitle').value;
+            const content = document.getElementById('postContent').value;
+
+            try {
+                const response = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({ title, content })
+                });
+
+                if (response.ok) {
+                    document.getElementById('postForm').reset();
+                    showMessage('文章发布成功！', 'success');
+                    loadPosts();
+                    loadStats();
+                } else {
+                    const error = await response.json();
+                    showMessage('发布失败: ' + error.message, 'error');
+                }
+            } catch (error) {
+                showMessage('发布失败: ' + error.message, 'error');
+            }
+        }
+
+        async function loadPosts() {
+            try {
+                const response = await fetch('/api/posts');
+                if (response.ok) {
+                    const data = await response.json();
+                    displayPosts(data.posts || data);
+                } else {
+                    document.getElementById('postsContainer').innerHTML = 
+                        '<div class="message error">无法加载文章</div>';
+                }
+            } catch (error) {
+                document.getElementById('postsContainer').innerHTML = 
+                    '<div class="message error">网络错误: ' + error.message + '</div>';
+            }
+        }
+
+        function displayPosts(posts) {
+            const container = document.getElementById('postsContainer');
+            
+            if (!posts || posts.length === 0) {
+                container.innerHTML = '<div class="message">暂无文章</div>';
+                return;
+            }
+
+            container.innerHTML = posts.map(post => createPostHTML(post)).join('');
+        }
+
+        function createPostHTML(post) {
+            return `
+                <article class="post-card">
+                    <div class="post-header">
+                        <h3 class="post-title">${escapeHtml(post.title)}</h3>
+                        <div class="post-meta">
+                            由 ${escapeHtml(post.author_username || post.author)} 发布于 
+                            ${new Date(post.created_at).toLocaleString('zh-CN')}
+                        </div>
+                    </div>
+                    <div class="post-content">${escapeHtml(post.content)}</div>
+                    <div class="post-actions">
+                        <button class="comment-btn" onclick="toggleComments(${post.id})">
+                            💬 查看评论
+                        </button>
+                    </div>
+                    <div class="comments-section" id="comments-${post.id}" style="display: none;">
+                        <div class="comment-form">
+                            <textarea placeholder="写下你的评论..." id="comment-input-${post.id}"></textarea>
+                            <button class="btn btn-primary btn-small" onclick="addComment(${post.id})">发表评论</button>
+                        </div>
+                        <div id="comments-list-${post.id}">
+                            <div class="loading">正在加载评论...</div>
+                        </div>
+                    </div>
+                </article>
+            `;
+        }
+
+        async function toggleComments(postId) {
+            const commentsSection = document.getElementById(`comments-${postId}`);
+            const isVisible = commentsSection.style.display !== 'none';
+            
+            if (isVisible) {
+                commentsSection.style.display = 'none';
+            } else {
+                commentsSection.style.display = 'block';
+                await loadComments(postId);
+            }
+        }
+
+        async function loadComments(postId) {
+            try {
+                const response = await fetch(`/api/comments/post/${postId}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    displayComments(postId, data.comments || []);
+                } else {
+                    document.getElementById(`comments-list-${postId}`).innerHTML = 
+                        '<div class="message error">无法加载评论</div>';
+                }
+            } catch (error) {
+                document.getElementById(`comments-list-${postId}`).innerHTML = 
+                    '<div class="message error">网络错误</div>';
+            }
+        }
+
+        function displayComments(postId, comments) {
+            const container = document.getElementById(`comments-list-${postId}`);
+            
+            if (comments.length === 0) {
+                container.innerHTML = '<div class="message">暂无评论</div>';
+                return;
+            }
+
+            container.innerHTML = comments.map(comment => `
+                <div class="comment">
+                    <div class="comment-author">
+                        ${escapeHtml(comment.author_name || comment.username)}
+                        <span class="comment-date">${new Date(comment.created_at).toLocaleString('zh-CN')}</span>
+                    </div>
+                    <div class="comment-content">${escapeHtml(comment.content)}</div>
+                </div>
+            `).join('');
+        }
+
+        async function addComment(postId) {
+            if (!authToken) {
+                showMessage('请先登录后发表评论', 'error');
+                return;
+            }
+
+            const input = document.getElementById(`comment-input-${postId}`);
+            const content = input.value.trim();
+            
+            if (!content) return;
+
+            try {
+                const response = await fetch(`/api/comments/post/${postId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({ content })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    showMessage('评论发表成功！', 'success');
+                    await loadComments(postId);
+                    loadStats();
+                } else {
+                    const error = await response.json();
+                    showMessage('评论失败: ' + error.message, 'error');
+                }
+            } catch (error) {
+                showMessage('评论失败: ' + error.message, 'error');
+            }
+        }
+
+        async function loadStats() {
+            try {
+                // Load posts count
+                const postsResponse = await fetch('/api/posts');
+                if (postsResponse.ok) {
+                    const postsData = await postsResponse.json();
+                    const postsCount = postsData.posts ? postsData.posts.length : (Array.isArray(postsData) ? postsData.length : 0);
+                    document.getElementById('totalPosts').textContent = postsCount;
+                }
+
+                // For now, set placeholder values for comments and users
+                document.getElementById('totalComments').textContent = '?';
+                document.getElementById('totalUsers').textContent = '?';
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        function showMessage(message, type) {
+            // Remove existing messages
+            document.querySelectorAll('.message').forEach(msg => {
+                if (msg.textContent.includes('登录') || msg.textContent.includes('注册') || 
+                    msg.textContent.includes('发布') || msg.textContent.includes('评论')) {
+                    msg.remove();
+                }
+            });
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = message;
+            
+            document.querySelector('.container').insertBefore(messageDiv, document.querySelector('.content-grid'));
+
+            setTimeout(() => messageDiv.remove(), 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

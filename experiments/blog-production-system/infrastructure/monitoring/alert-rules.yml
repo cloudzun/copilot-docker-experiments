@@ -1,0 +1,147 @@
+groups:
+- name: blog-microservices-production
+  rules:
+  
+  # 服务可用性告警
+  - alert: ServiceDown
+    expr: up{job=~"user-service|post-service|comment-service"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "微服务 {{ $labels.job }} 已下线"
+      description: "{{ $labels.job }} 在实例 {{ $labels.instance }} 上已下线超过1分钟"
+
+  # HTTP错误率告警
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.service }} HTTP错误率过高"
+      description: "{{ $labels.service }} 的5xx错误率在过去5分钟内超过10%"
+
+  # 内存使用率告警
+  - alert: HighMemoryUsage
+    expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.name }} 内存使用率过高"
+      description: "容器 {{ $labels.name }} 内存使用率超过80%，当前值: {{ $value }}%"
+
+  # CPU使用率告警
+  - alert: HighCPUUsage
+    expr: rate(container_cpu_usage_seconds_total[5m]) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.name }} CPU使用率过高"
+      description: "容器 {{ $labels.name }} CPU使用率超过80%"
+
+  # 数据库相关告警
+  - alert: MySQLDown
+    expr: mysql_up == 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "MySQL数据库不可用"
+      description: "MySQL数据库 {{ $labels.instance }} 连接失败"
+
+  - alert: MySQLSlowQueries
+    expr: rate(mysql_global_status_slow_queries[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL慢查询过多"
+      description: "MySQL {{ $labels.instance }} 慢查询率过高: {{ $value }} queries/sec"
+
+  - alert: MySQLConnectionsHigh
+    expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections * 100 > 80
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL连接数过高"
+      description: "MySQL {{ $labels.instance }} 连接使用率: {{ $value }}%"
+
+  # Redis告警
+  - alert: RedisDown
+    expr: redis_up == 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis服务不可用"
+      description: "Redis {{ $labels.instance }} 连接失败"
+
+  - alert: RedisMemoryHigh
+    expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 90
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis内存使用率过高"
+      description: "Redis {{ $labels.instance }} 内存使用率: {{ $value }}%"
+
+  # Elasticsearch告警
+  - alert: ElasticsearchDown
+    expr: elasticsearch_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Elasticsearch服务不可用"
+      description: "Elasticsearch {{ $labels.instance }} 不可用"
+
+  - alert: ElasticsearchClusterHealthRed
+    expr: elasticsearch_cluster_health_status{color="red"} == 1
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Elasticsearch集群健康状态为红色"
+      description: "Elasticsearch集群 {{ $labels.cluster }} 处于红色状态"
+
+  # 业务指标告警
+  - alert: LowUserActivity
+    expr: rate(http_requests_total{job="user-service", method="POST"}[1h]) < 0.01
+    for: 30m
+    labels:
+      severity: info
+    annotations:
+      summary: "用户活跃度低"
+      description: "过去1小时用户注册/登录活动较少"
+
+  - alert: HighResponseTime
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.service }} 响应时间过长"
+      description: "{{ $labels.service }} 95%分位响应时间超过2秒: {{ $value }}s"
+
+  # 磁盘空间告警
+  - alert: DiskSpaceLow
+    expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 20
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "磁盘空间不足"
+      description: "{{ $labels.instance }} 磁盘 {{ $labels.mountpoint }} 可用空间低于20%"
+
+  - alert: DiskSpaceCritical
+    expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "磁盘空间严重不足"
+      description: "{{ $labels.instance }} 磁盘 {{ $labels.mountpoint }} 可用空间低于10%"
