@@ -3935,47 +3935,149 @@ curl http://192.168.14.201:8083
 
 ---
 
-## 📖 Module 6: 项目整合与生产优化
+## 📖 Module 6: 生产级优化与项目整合
 
 ### 🎯 学习目标
-- 完成个人博客系统的所有功能模块
-- 掌握生产环境部署和优化技巧
-- 实现监控、日志和性能调优
+- 基于Module 5微服务系统进行生产级优化
+- 实现完整的监控、日志和运维体系
+- 掌握高可用部署和性能调优技术
+- 完成从开发到生产的完整交付链路
 
 ### 📚 理论学习 (2小时)
 
-#### 6.1 生产环境考虑因素
+#### 6.1 生产环境架构演进
+
+**基于Module 5的架构升级路径**:
 ```
-┌─────────────────────────────────────────────────┐
-│               生产环境检查清单                   │
-├─────────────────────────────────────────────────┤
-│ ✅ 健康检查和存活探针                           │
-│ ✅ 资源限制和请求配置                           │
-│ ✅ 数据备份和恢复策略                           │
-│ ✅ 日志收集和监控告警                           │
-│ ✅ 安全配置和权限管理                           │
-│ ✅ 高可用和故障转移                             │
-└─────────────────────────────────────────────────┘
+Module 5: 微服务基础架构
+┌─────────────────────────────────────────────────────────────┐
+│ Frontend → API Gateway → [User Service]   → Shared Database │
+│ (React)   (Nginx路由)    [Post Service]   → + Redis Cache   │
+│                         [Comment Service] → (MySQL)         │
+└─────────────────────────────────────────────────────────────┘
+
+Module 6: 生产级架构升级
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Load Balancer → API Gateway → [User Service × 2]   → Database Cluster   │
+│ (Nginx/HAProxy) (Enhanced)    [Post Service × 3]   → (Master/Slave)     │
+│       ↓                       [Comment Service × 2] → Redis Cluster     │
+│  Monitoring Stack             [Media Service]       → File Storage      │
+│  (Prometheus/Grafana)         └── Health Checks ────┘  (Minio/S3)       │
+│       ↓                                                                 │
+│  Logging & Alerting                                                     │
+│  (ELK Stack / Loki)                                                     │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 6.2 容器优化最佳实践
-- **镜像优化**: 使用Alpine、多阶段构建
-- **安全强化**: 非root用户、最小权限原则
-- **性能调优**: 资源限制、JVM参数优化
-- **监控指标**: CPU、内存、网络、应用指标
+#### 6.2 生产环境核心要素
+
+**✅ 可靠性保障**:
+```yaml
+生产级要求清单:
+  服务可用性: 99.9% (年停机时间 < 8.76小时)
+  故障恢复: RTO < 15分钟, RPO < 5分钟
+  数据备份: 自动化日备份 + 异地容灾
+  监控覆盖: 系统指标 + 应用指标 + 业务指标
+  日志管理: 集中收集 + 结构化存储 + 实时告警
+  安全防护: 认证授权 + 网络隔离 + 数据加密
+```
+
+**✅ 性能优化目标**:
+```yaml
+响应时间:
+  API平均响应: < 100ms
+  页面加载时间: < 2秒
+  数据库查询: < 50ms
+  
+并发能力:
+  单服务QPS: > 1000
+  系统总QPS: > 5000
+  并发用户: > 500
+  
+资源利用:
+  CPU使用率: 60-80%
+  内存使用率: < 80%
+  磁盘I/O: < 80%
+```
+
+#### 6.3 微服务生产化改造策略
+
+**基于现有代码的渐进式升级**:
+```javascript
+// 复用Module 5的三个微服务，添加生产级特性
+blog-microservices-system/
+├── services/                   # 现有微服务增强
+│   ├── user-service/           # ✅ 已有基础
+│   │   ├── app.js             # 增加: 性能监控、限流、缓存
+│   │   ├── health.js          # 新增: 深度健康检查
+│   │   └── metrics.js         # 新增: Prometheus指标
+│   │
+│   ├── post-service/           # ✅ 已有基础  
+│   │   ├── app.js             # 增加: 搜索优化、缓存策略
+│   │   ├── search.js          # 新增: Elasticsearch集成
+│   │   └── cache.js           # 新增: 多级缓存
+│   │
+│   ├── comment-service/        # ✅ 已有基础
+│   │   ├── app.js             # 增加: 反垃圾、通知
+│   │   ├── moderation.js      # 新增: 智能审核
+│   │   └── notification.js    # 新增: 邮件通知
+│   │
+│   └── media-service/          # 🆕 新增服务
+│       ├── app.js             # 文件上传、处理、CDN
+│       ├── upload.js          # 多种存储后端支持
+│       └── image.js           # 图片压缩、格式转换
+│
+├── infrastructure/             # 🆕 基础设施配置
+│   ├── monitoring/            # Prometheus + Grafana
+│   ├── logging/               # ELK Stack / Loki
+│   ├── secrets/               # 密钥管理
+│   └── backup/                # 备份恢复脚本
+│
+└── deployment/                 # 🆕 部署配置
+    ├── docker-compose.prod.yml    # 生产环境配置
+    ├── docker-compose.staging.yml # 测试环境配置
+    ├── nginx.prod.conf            # 负载均衡配置
+    └── ci-cd/                     # 自动化部署
+```
 
 ### 🛠️ 实践操作 (8小时)
 
-#### 6.3 生产级配置优化
-```yaml
-# docker-compose.prod.yml
+#### 6.4 第一阶段: 现有系统生产化配置 (2小时)
+
+**步骤1: 创建生产环境配置目录**
+```bash
+# 在现有blog-microservices-system基础上扩展
+cd /root/copilot-docker-experiments/experiments/blog-microservices-system
+
+# 创建生产化目录结构
+mkdir -p deployment/{production,staging,monitoring,logging}
+mkdir -p infrastructure/{prometheus,grafana,nginx}
+mkdir -p scripts/{backup,maintenance,deployment}
+```
+
+**步骤2: 生产级Docker Compose配置**
+```bash
+# 创建生产环境配置文件
+cat > deployment/production/docker-compose.prod.yml << 'EOF'
 version: '3.8'
 
 services:
-  web:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
+  # API网关 - 生产级配置
+  api-gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx/nginx.prod.conf:/etc/nginx/nginx.conf
+      - ./frontend:/usr/share/nginx/html
+      - ./infrastructure/nginx/ssl:/etc/nginx/ssl
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - user-service
+      - post-service
+      - comment-service
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -3985,22 +4087,280 @@ services:
           cpus: '0.25'
           memory: 256M
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    networks:
+      - frontend-network
+      - backend-network
 
-  api:
+  # 用户服务 - 高可用配置
+  user-service:
     build:
-      context: ./backend
+      context: ./services/user-service
       dockerfile: Dockerfile.prod
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=database-master
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_HOST=redis-cluster
+      - LOG_LEVEL=info
+      - METRICS_PORT=9090
+    depends_on:
+      - database-master
+      - redis-cluster
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - backend-network
+
+  # 文章服务 - 搜索优化
+  post-service:
+    build:
+      context: ./services/post-service
+      dockerfile: Dockerfile.prod
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=database-master
+      - DB_SLAVE_HOST=database-slave
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis-cluster
+      - ELASTICSEARCH_HOST=elasticsearch
+      - CACHE_TTL=3600
+      - LOG_LEVEL=info
+    depends_on:
+      - database-master
+      - database-slave
+      - redis-cluster
+      - elasticsearch
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.75'
+          memory: 768M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - backend-network
+
+  # 评论服务 - 反垃圾增强
+  comment-service:
+    build:
+      context: ./services/comment-service
+      dockerfile: Dockerfile.prod
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=database-master
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis-cluster
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - LOG_LEVEL=info
+    depends_on:
+      - database-master
+      - redis-cluster
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - backend-network
+
+  # 新增媒体服务
+  media-service:
+    build:
+      context: ./services/media-service
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - MINIO_ENDPOINT=minio
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - REDIS_HOST=redis-cluster
+      - MAX_FILE_SIZE=50MB
+      - ALLOWED_TYPES=image/jpeg,image/png,image/gif,image/webp
+    depends_on:
+      - minio
+      - redis-cluster
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    volumes:
+      - media_temp:/tmp/uploads
+    networks:
+      - backend-network
+
+  # 数据库主节点
+  database-master:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=blog_system
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_BINLOG_FORMAT=ROW
+      - MYSQL_SERVER_ID=1
+    volumes:
+      - mysql_master_data:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+      - ./infrastructure/mysql/master.cnf:/etc/mysql/conf.d/mysql.cnf
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    networks:
+      - backend-network
+
+  # 数据库从节点
+  database-slave:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=blog_system
+      - MYSQL_USER=bloguser
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_MASTER_HOST=database-master
+      - MYSQL_SERVER_ID=2
+    volumes:
+      - mysql_slave_data:/var/lib/mysql
+      - ./infrastructure/mysql/slave.cnf:/etc/mysql/conf.d/mysql.cnf
+    depends_on:
+      - database-master
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 1.5G
+        reservations:
+          cpus: '0.75'
+          memory: 768M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+
+  # Redis集群
+  redis-cluster:
+    image: redis:7-alpine
+    command: redis-server /etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./infrastructure/redis/redis.conf:/etc/redis/redis.conf
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -4010,81 +4370,2312 @@ services:
           cpus: '0.5'
           memory: 512M
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+    networks:
+      - backend-network
+
+  # Minio对象存储
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - backend-network
+
+volumes:
+  mysql_master_data:
+  mysql_slave_data:
+  redis_data:
+  elasticsearch_data:
+  minio_data:
+  media_temp:
+  nginx_logs:
+
+networks:
+  frontend-network:
+    driver: bridge
+  backend-network:
+    driver: bridge
+    internal: true
+
+secrets:
+  db_password:
+    external: true
+  jwt_secret:
+    external: true
+EOF
+```
+
+**步骤3: 生产级Nginx配置**
+```bash
+# 创建生产级nginx配置
+mkdir -p infrastructure/nginx
+cat > infrastructure/nginx/nginx.prod.conf << 'EOF'
+# 生产级Nginx配置
+events {
+    worker_connections 2048;
+    use epoll;
+    multi_accept on;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+    
+    # 日志格式
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for" '
+                    'rt=$request_time uct="$upstream_connect_time" '
+                    'uht="$upstream_header_time" urt="$upstream_response_time" '
+                    'service="$upstream_addr"';
+    
+    access_log /var/log/nginx/access.log main;
+    error_log  /var/log/nginx/error.log warn;
+    
+    # 性能优化
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    client_max_body_size 50M;
+    
+    # Gzip压缩
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript 
+               application/json application/javascript application/xml+rss 
+               application/atom+xml image/svg+xml;
+    
+    # 安全头
+    add_header X-Frame-Options DENY always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    
+    # 限流配置
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/s;
+    
+    # 上游服务定义 - 负载均衡
+    upstream user_service {
+        least_conn;
+        server user-service:3001 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+    
+    upstream post_service {
+        least_conn;
+        server post-service:3002 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+    
+    upstream comment_service {
+        least_conn;
+        server comment-service:3003 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+    
+    upstream media_service {
+        least_conn;
+        server media-service:3004 max_fails=3 fail_timeout=30s;
+        keepalive 32;
+    }
+    
+    # 主服务器配置
+    server {
+        listen 80;
+        server_name localhost;
+        
+        # 静态文件缓存
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            root /usr/share/nginx/html;
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+        
+        # 静态文件服务
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+            try_files $uri $uri/ /index.html;
+            
+            # 缓存配置
+            location ~* \.html$ {
+                expires 1h;
+                add_header Cache-Control "public";
+            }
+        }
+        
+        # 健康检查端点
+        location /health {
+            access_log off;
+            return 200 '{"status":"healthy","timestamp":"$time_iso8601"}';
+            add_header Content-Type application/json;
+        }
+        
+        # API路由 - 用户认证服务
+        location /api/users/ {
+            limit_req zone=auth burst=20 nodelay;
+            
+            proxy_pass http://user_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 超时配置
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+            
+            # 错误处理
+            proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+            proxy_next_upstream_tries 2;
+            proxy_next_upstream_timeout 10s;
+        }
+        
+        # API路由 - 文章服务
+        location /api/posts/ {
+            limit_req zone=api burst=50 nodelay;
+            
+            proxy_pass http://post_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 缓存配置 (GET请求)
+            proxy_cache_methods GET HEAD;
+            proxy_cache_valid 200 302 5m;
+            proxy_cache_valid 404 1m;
+            
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+            
+            proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+        }
+        
+        # API路由 - 评论服务
+        location /api/comments/ {
+            limit_req zone=api burst=30 nodelay;
+            
+            proxy_pass http://comment_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+            
+            proxy_next_upstream error timeout invalid_header http_500 http_502 http_503;
+        }
+        
+        # API路由 - 媒体服务
+        location /api/media/ {
+            limit_req zone=api burst=20 nodelay;
+            
+            proxy_pass http://media_service/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # 文件上传超时
+            proxy_connect_timeout 10s;
+            proxy_send_timeout 300s;
+            proxy_read_timeout 300s;
+            
+            client_max_body_size 50M;
+        }
+        
+        # Nginx状态监控
+        location /nginx_status {
+            stub_status on;
+            access_log off;
+            allow 127.0.0.1;
+            allow 10.0.0.0/8;
+            allow 172.16.0.0/12;
+            allow 192.168.0.0/16;
+            deny all;
+        }
+    }
+    
+    # HTTPS配置 (生产环境)
+    # server {
+    #     listen 443 ssl http2;
+    #     server_name your-domain.com;
+    #     
+    #     ssl_certificate /etc/nginx/ssl/cert.pem;
+    #     ssl_certificate_key /etc/nginx/ssl/key.pem;
+    #     ssl_protocols TLSv1.2 TLSv1.3;
+    #     ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+    #     ssl_prefer_server_ciphers off;
+    #     
+    #     # 其他配置同上...
+    # }
+}
+EOF
+```
+
+#### 6.5 第二阶段: 监控和运维工具集成 (4小时)
+#### 6.5 第二阶段: 监控和运维工具集成 (4小时)
+
+**步骤4: Prometheus监控配置**
+```bash
+# 创建Prometheus配置
+mkdir -p infrastructure/prometheus
+cat > infrastructure/prometheus/prometheus.yml << 'EOF'
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus自监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter - 系统指标
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Nginx指标
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['api-gateway:9113']
+    metrics_path: /metrics
+
+  # 微服务应用指标
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:9090']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'post-service'
+    static_configs:
+      - targets: ['post-service:9090']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'comment-service'
+    static_configs:
+      - targets: ['comment-service:9090']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  - job_name: 'media-service'
+    static_configs:
+      - targets: ['media-service:9090']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # MySQL数据库指标
+  - job_name: 'mysql-master'
+    static_configs:
+      - targets: ['mysql-exporter-master:9104']
+
+  - job_name: 'mysql-slave'
+    static_configs:
+      - targets: ['mysql-exporter-slave:9104']
+
+  # Redis指标
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Elasticsearch指标
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+
+  # Minio指标
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    metrics_path: /minio/prometheus/metrics
+EOF
+
+# 创建告警规则
+mkdir -p infrastructure/prometheus/rules
+cat > infrastructure/prometheus/rules/blog-system.yml << 'EOF'
+groups:
+  - name: blog-system-alerts
+    rules:
+      # 服务可用性告警
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务 {{ $labels.job }} 不可用"
+          description: "服务 {{ $labels.job }} 已经宕机超过1分钟"
+
+      # 高响应时间告警
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} 响应时间过高"
+          description: "95%的请求响应时间超过500ms，当前值: {{ $value }}s"
+
+      # CPU使用率告警
+      - alert: HighCPUUsage
+        expr: (100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU使用率过高"
+          description: "实例 {{ $labels.instance }} CPU使用率已超过80%，当前值: {{ $value }}%"
+
+      # 内存使用率告警
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高"
+          description: "实例 {{ $labels.instance }} 内存使用率已超过85%，当前值: {{ $value }}%"
+
+      # 磁盘空间告警
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "磁盘空间不足"
+          description: "实例 {{ $labels.instance }} 磁盘使用率已超过90%"
+
+      # 数据库连接数告警
+      - alert: MySQLHighConnections
+        expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MySQL连接数过高"
+          description: "MySQL连接数使用率已超过80%"
+
+      # Redis内存使用告警
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis内存使用率过高"
+          description: "Redis内存使用率已超过80%"
+EOF
+```
+
+**步骤5: Grafana仪表板配置**
+```bash
+# 创建Grafana配置目录
+mkdir -p infrastructure/grafana/{dashboards,datasources}
+
+# Grafana数据源配置
+cat > infrastructure/grafana/datasources/prometheus.yml << 'EOF'
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: 5s
+      httpMethod: POST
+EOF
+
+# 创建博客系统仪表板配置
+cat > infrastructure/grafana/dashboards/blog-system-overview.json << 'EOF'
+{
+  "dashboard": {
+    "id": null,
+    "title": "博客系统总览",
+    "tags": ["blog", "microservices"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "服务状态",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up",
+            "legendFormat": "{{ job }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"type": "value", "value": "0", "text": "DOWN"},
+              {"type": "value", "value": "1", "text": "UP"}
+            ]
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "QPS (每秒请求数)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total[5m])) by (service)",
+            "legendFormat": "{{ service }}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "响应时间",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "50th percentile"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "系统资源使用率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "legendFormat": "CPU使用率"
+          },
+          {
+            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+            "legendFormat": "内存使用率"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "数据库性能",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "mysql_global_status_queries",
+            "legendFormat": "总查询数"
+          },
+          {
+            "expr": "mysql_global_status_slow_queries",
+            "legendFormat": "慢查询数"
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+```
+
+**步骤6: 日志管理配置**
+```bash
+# 创建日志配置目录
+mkdir -p infrastructure/logging
+
+# ELK Stack配置 (简化版)
+cat > infrastructure/logging/docker-compose.logging.yml << 'EOF'
+version: '3.8'
+
+services:
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+    volumes:
+      - elasticsearch_logs:/usr/share/elasticsearch/data
+    networks:
+      - logging-network
+
+  # Logstash
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.10.0
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+    environment:
+      - "LS_JAVA_OPTS=-Xmx512m -Xms512m"
+    depends_on:
+      - elasticsearch
+    networks:
+      - logging-network
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - logging-network
+
+  # Filebeat (日志收集)
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.10.0
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - logging-network
+
+volumes:
+  elasticsearch_logs:
+
+networks:
+  logging-network:
+    driver: bridge
+EOF
+
+# Filebeat配置
+mkdir -p infrastructure/logging/filebeat
+cat > infrastructure/logging/filebeat/filebeat.yml << 'EOF'
+filebeat.inputs:
+  - type: container
+    paths:
+      - '/var/lib/docker/containers/*/*.log'
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  index: "blog-system-logs-%{+yyyy.MM.dd}"
+
+setup.template.name: "blog-system"
+setup.template.pattern: "blog-system-logs-*"
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+EOF
+```
+
+#### 6.6 第三阶段: 功能完善和用户体验优化 (4小时)
+
+**步骤7: 媒体服务开发**
+```bash
+# 创建媒体服务目录
+mkdir -p services/media-service
+
+# 媒体服务package.json
+cat > services/media-service/package.json << 'EOF'
+{
+  "name": "media-service",
+  "version": "1.0.0",
+  "description": "Media upload and processing service",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5",
+    "sharp": "^0.32.6",
+    "minio": "^7.1.3",
+    "redis": "^4.6.7",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^6.10.0"
+  }
+}
+EOF
+
+# 媒体服务主程序
+cat > services/media-service/app.js << 'EOF'
+const express = require('express');
+const multer = require('multer');
+const sharp = require('sharp');
+const { Client } = require('minio');
+const redis = require('redis');
+const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+const fs = require('fs').promises;
+
+const app = express();
+const port = process.env.PORT || 3004;
+
+// 中间件配置
+app.use(helmet());
+app.use(compression());
+app.use(cors());
+app.use(express.json());
+
+// 限流配置
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15分钟
+  max: 10, // 最多10次上传
+  message: { error: '上传次数过多，请稍后再试' }
+});
+
+// Minio客户端配置
+const minioClient = new Client({
+  endPoint: process.env.MINIO_ENDPOINT || 'minio',
+  port: 9000,
+  useSSL: false,
+  accessKey: process.env.MINIO_ACCESS_KEY || 'minioadmin',
+  secretKey: process.env.MINIO_SECRET_KEY || 'minioadmin'
+});
+
+// Redis客户端配置
+let redisClient;
+(async () => {
+  try {
+    redisClient = redis.createClient({
+      socket: {
+        host: process.env.REDIS_HOST || 'redis-cluster',
+        port: 6379
+      }
+    });
+    
+    redisClient.on('error', (err) => console.log('Redis Client Error', err));
+    await redisClient.connect();
+    console.log('✅ Media Service: Redis connected successfully');
+  } catch (error) {
+    console.log('❌ Media Service: Redis connection failed:', error.message);
+  }
+})();
+
+// 确保存储桶存在
+const BUCKET_NAME = 'blog-media';
+(async () => {
+  try {
+    const exists = await minioClient.bucketExists(BUCKET_NAME);
+    if (!exists) {
+      await minioClient.makeBucket(BUCKET_NAME, 'us-east-1');
+      console.log(`✅ Created bucket: ${BUCKET_NAME}`);
+    }
+  } catch (error) {
+    console.error('❌ Bucket creation error:', error);
+  }
+})();
+
+// Multer配置 - 内存存储
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE || '50') * 1024 * 1024, // 默认50MB
+    files: 5 // 最多5个文件
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = (process.env.ALLOWED_TYPES || 'image/jpeg,image/png,image/gif,image/webp').split(',');
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`不支持的文件类型: ${file.mimetype}`), false);
+    }
+  }
+});
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({
+    service: 'media-service',
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    minio: 'connected',
+    redis: redisClient?.isOpen ? 'connected' : 'disconnected'
+  });
+});
+
+// 图片上传接口
+app.post('/upload', uploadLimiter, upload.array('files', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: '请选择要上传的文件' });
+    }
+
+    const uploadPromises = req.files.map(async (file) => {
+      // 生成唯一文件名
+      const timestamp = Date.now();
+      const randomStr = Math.random().toString(36).substring(2, 15);
+      const fileExtension = path.extname(file.originalname);
+      const fileName = `${timestamp}_${randomStr}${fileExtension}`;
+
+      // 图片压缩和优化
+      let processedBuffer;
+      if (file.mimetype.startsWith('image/')) {
+        processedBuffer = await sharp(file.buffer)
+          .resize(1920, 1080, { 
+            fit: 'inside', 
+            withoutEnlargement: true 
+          })
+          .jpeg({ 
+            quality: 85, 
+            progressive: true 
+          })
+          .toBuffer();
+      } else {
+        processedBuffer = file.buffer;
+      }
+
+      // 上传到Minio
+      const objectName = `uploads/${new Date().getFullYear()}/${new Date().getMonth() + 1}/${fileName}`;
+      await minioClient.putObject(BUCKET_NAME, objectName, processedBuffer, {
+        'Content-Type': file.mimetype,
+        'Content-Length': processedBuffer.length,
+        'X-Original-Name': file.originalname
+      });
+
+      // 生成访问URL
+      const fileUrl = `/api/media/file/${objectName}`;
+
+      // 缓存文件信息
+      const fileInfo = {
+        originalName: file.originalname,
+        fileName: fileName,
+        objectName: objectName,
+        size: processedBuffer.length,
+        mimetype: file.mimetype,
+        uploadTime: new Date().toISOString(),
+        url: fileUrl
+      };
+
+      if (redisClient?.isOpen) {
+        await redisClient.setEx(`file:${fileName}`, 86400, JSON.stringify(fileInfo)); // 缓存24小时
+      }
+
+      return fileInfo;
+    });
+
+    const uploadResults = await Promise.all(uploadPromises);
+
+    res.json({
+      message: '文件上传成功',
+      files: uploadResults
+    });
+
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ 
+      error: '文件上传失败', 
+      details: error.message 
+    });
+  }
+});
+
+// 文件访问接口
+app.get('/file/*', async (req, res) => {
+  try {
+    const objectName = req.params[0];
+    
+    // 检查缓存
+    if (redisClient?.isOpen) {
+      const cached = await redisClient.get(`file_content:${objectName}`);
+      if (cached) {
+        const { buffer, contentType } = JSON.parse(cached);
+        res.set('Content-Type', contentType);
+        res.set('Cache-Control', 'public, max-age=86400'); // 缓存1天
+        return res.send(Buffer.from(buffer, 'base64'));
+      }
+    }
+
+    // 从Minio获取文件
+    const stream = await minioClient.getObject(BUCKET_NAME, objectName);
+    const chunks = [];
+    
+    stream.on('data', (chunk) => chunks.push(chunk));
+    stream.on('end', async () => {
+      const buffer = Buffer.concat(chunks);
+      
+      // 获取文件信息
+      const stat = await minioClient.statObject(BUCKET_NAME, objectName);
+      const contentType = stat.metaData['content-type'] || 'application/octet-stream';
+      
+      // 缓存文件内容
+      if (redisClient?.isOpen && buffer.length < 1024 * 1024) { // 只缓存小于1MB的文件
+        await redisClient.setEx(`file_content:${objectName}`, 3600, JSON.stringify({
+          buffer: buffer.toString('base64'),
+          contentType
+        }));
+      }
+      
+      res.set('Content-Type', contentType);
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.send(buffer);
+    });
+    
+    stream.on('error', (error) => {
+      console.error('Stream error:', error);
+      res.status(404).json({ error: '文件不存在' });
+    });
+
+  } catch (error) {
+    console.error('File access error:', error);
+    res.status(404).json({ error: '文件不存在' });
+  }
+});
+
+// 文件删除接口
+app.delete('/file/:fileName', async (req, res) => {
+  try {
+    const { fileName } = req.params;
+    
+    // 从缓存获取文件信息
+    let fileInfo;
+    if (redisClient?.isOpen) {
+      const cached = await redisClient.get(`file:${fileName}`);
+      if (cached) {
+        fileInfo = JSON.parse(cached);
+      }
+    }
+    
+    if (!fileInfo) {
+      return res.status(404).json({ error: '文件不存在' });
+    }
+    
+    // 从Minio删除文件
+    await minioClient.removeObject(BUCKET_NAME, fileInfo.objectName);
+    
+    // 清除缓存
+    if (redisClient?.isOpen) {
+      await redisClient.del(`file:${fileName}`);
+      await redisClient.del(`file_content:${fileInfo.objectName}`);
+    }
+    
+    res.json({ message: '文件删除成功' });
+    
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ error: '文件删除失败' });
+  }
+});
+
+// 文件列表接口
+app.get('/files', async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    
+    // 这里简化实现，实际生产中应该用数据库存储文件元信息
+    const objects = [];
+    const stream = minioClient.listObjects(BUCKET_NAME, 'uploads/', true);
+    
+    stream.on('data', (obj) => objects.push(obj));
+    stream.on('end', () => {
+      const startIndex = (page - 1) * limit;
+      const endIndex = page * limit;
+      const paginatedObjects = objects.slice(startIndex, endIndex);
+      
+      res.json({
+        files: paginatedObjects.map(obj => ({
+          name: obj.name,
+          size: obj.size,
+          lastModified: obj.lastModified,
+          url: `/api/media/file/${obj.name}`
+        })),
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: objects.length,
+          totalPages: Math.ceil(objects.length / limit)
+        }
+      });
+    });
+    
+    stream.on('error', (error) => {
+      console.error('List error:', error);
+      res.status(500).json({ error: '获取文件列表失败' });
+    });
+    
+  } catch (error) {
+    console.error('Files list error:', error);
+    res.status(500).json({ error: '获取文件列表失败' });
+  }
+});
+
+// 错误处理中间件
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: '文件大小超出限制' });
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ error: '文件数量超出限制' });
+    }
+  }
+  
+  console.error('Unhandled error:', error);
+  res.status(500).json({ error: '服务器内部错误' });
+});
+
+// 启动服务器
+app.listen(port, '0.0.0.0', () => {
+  console.log(`🚀 Media Service running on port ${port}`);
+});
+EOF
+
+# 媒体服务Dockerfile
+cat > services/media-service/Dockerfile << 'EOF'
+FROM node:18-alpine
+
+# 安装系统依赖 (Sharp需要)
+RUN apk add --no-cache \
+    libc6-compat \
+    vips-dev \
+    build-base \
+    curl
+
+WORKDIR /app
+
+# 复制package文件
+COPY package*.json ./
+RUN npm install --production
+
+# 复制应用代码
+COPY . .
+
+# 创建非root用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# 创建临时目录
+RUN mkdir -p /tmp/uploads && \
+    chown -R nodejs:nodejs /app /tmp/uploads
+
+USER nodejs
+
+EXPOSE 3004
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3004/health || exit 1
+
+CMD ["npm", "start"]
+EOF
+```
+
+**步骤8: 前端功能增强**
+```bash
+# 基于现有前端界面，添加文件上传功能
+# 备份现有前端
+cp frontend/index.html frontend/index.html.module5-backup
+
+# 创建增强版前端 (在现有基础上添加媒体上传功能)
+cat >> frontend/index.html << 'EOF'
+
+        <!-- 媒体管理面板 -->
+        <div id="media-section" class="auth-section">
+            <div class="panel">
+                <div class="panel-header">
+                    <span>🖼️ 媒体文件管理</span>
+                </div>
+                <div class="panel-content">
+                    <div class="form-group">
+                        <label>选择文件上传:</label>
+                        <input type="file" id="file-input" multiple accept="image/*" 
+                               style="margin-bottom: 15px;">
+                        <button onclick="uploadFiles()" id="upload-btn">上传文件</button>
+                    </div>
+                    
+                    <div id="upload-progress" class="hidden">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="progress-text">上传中...</div>
+                    </div>
+                    
+                    <div id="upload-results"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <span>📁 文件列表</span>
+                    <button class="refresh-btn" onclick="loadMediaFiles()">刷新列表</button>
+                </div>
+                <div class="panel-content">
+                    <div id="media-container">正在加载文件...</div>
+                </div>
+            </div>
+        </div>
+
+    <!-- 在现有JavaScript代码后添加 -->
+    <script>
+        // 媒体文件管理功能
+        async function uploadFiles() {
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                alert('请选择要上传的文件');
+                return;
+            }
+            
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            
+            try {
+                document.getElementById('upload-progress').classList.remove('hidden');
+                document.getElementById('upload-btn').disabled = true;
+                
+                const xhr = new XMLHttpRequest();
+                
+                // 上传进度
+                xhr.upload.onprogress = function(e) {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        document.getElementById('progress-fill').style.width = percentComplete + '%';
+                        document.getElementById('progress-text').textContent = `上传中... ${Math.round(percentComplete)}%`;
+                    }
+                };
+                
+                xhr.onload = function() {
+                    document.getElementById('upload-progress').classList.add('hidden');
+                    document.getElementById('upload-btn').disabled = false;
+                    
+                    if (xhr.status === 200) {
+                        const result = JSON.parse(xhr.responseText);
+                        displayUploadResults(result.files);
+                        loadMediaFiles(); // 刷新文件列表
+                        fileInput.value = ''; // 清空文件选择
+                    } else {
+                        const error = JSON.parse(xhr.responseText);
+                        alert('上传失败: ' + error.error);
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    document.getElementById('upload-progress').classList.add('hidden');
+                    document.getElementById('upload-btn').disabled = false;
+                    alert('上传失败: 网络错误');
+                };
+                
+                xhr.open('POST', '/api/media/upload');
+                xhr.send(formData);
+                
+            } catch (error) {
+                document.getElementById('upload-progress').classList.add('hidden');
+                document.getElementById('upload-btn').disabled = false;
+                alert('上传失败: ' + error.message);
+            }
+        }
+        
+        function displayUploadResults(files) {
+            const container = document.getElementById('upload-results');
+            container.innerHTML = `
+                <h4>✅ 上传成功 (${files.length}个文件)</h4>
+                ${files.map(file => `
+                    <div class="upload-result-item">
+                        <strong>${file.originalName}</strong>
+                        <div>大小: ${(file.size / 1024 / 1024).toFixed(2)} MB</div>
+                        <div>访问地址: <a href="${file.url}" target="_blank">${file.url}</a></div>
+                    </div>
+                `).join('')}
+            `;
+        }
+        
+        async function loadMediaFiles() {
+            try {
+                const response = await fetch('/api/media/files?limit=10');
+                const data = await response.json();
+                
+                const container = document.getElementById('media-container');
+                
+                if (data.files.length === 0) {
+                    container.innerHTML = '<p>暂无文件</p>';
+                    return;
+                }
+                
+                container.innerHTML = `
+                    <div class="media-grid">
+                        ${data.files.map(file => `
+                            <div class="media-item">
+                                ${file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? 
+                                    `<img src="${file.url}" alt="${file.name}" class="media-preview">` :
+                                    `<div class="media-file-icon">📄</div>`
+                                }
+                                <div class="media-info">
+                                    <div class="media-name" title="${file.name}">${file.name.substring(0, 20)}...</div>
+                                    <div class="media-size">${(file.size / 1024).toFixed(1)} KB</div>
+                                    <div class="media-actions">
+                                        <button onclick="copyUrl('${file.url}')" class="btn-small">复制链接</button>
+                                        <button onclick="deleteFile('${file.name}')" class="btn-small btn-danger">删除</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="pagination">
+                        <div>共 ${data.pagination.total} 个文件</div>
+                        <div>第 ${data.pagination.page} / ${data.pagination.totalPages} 页</div>
+                    </div>
+                `;
+                
+            } catch (error) {
+                document.getElementById('media-container').innerHTML = '<p>加载文件列表失败: ' + error.message + '</p>';
+            }
+        }
+        
+        function copyUrl(url) {
+            navigator.clipboard.writeText(window.location.origin + url).then(() => {
+                alert('链接已复制到剪贴板');
+            }).catch(() => {
+                alert('复制失败，请手动复制: ' + window.location.origin + url);
+            });
+        }
+        
+        async function deleteFile(fileName) {
+            if (!confirm('确定要删除这个文件吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/media/file/${fileName}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('文件删除成功');
+                    loadMediaFiles(); // 刷新列表
+                } else {
+                    const error = await response.json();
+                    alert('删除失败: ' + error.error);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        // 在页面初始化时加载媒体文件
+        document.addEventListener('DOMContentLoaded', function() {
+            // ... 现有初始化代码 ...
+            if (currentSection === 'media') {
+                loadMediaFiles();
+            }
+        });
+    </script>
+
+    <!-- 添加媒体管理相关样式 -->
+    <style>
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .progress-text {
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .upload-result-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .media-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+        }
+        
+        .media-item:hover {
+            transform: translateY(-2px);
+        }
+        
+        .media-preview {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+        
+        .media-file-icon {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3em;
+            background: #e9ecef;
+        }
+        
+        .media-info {
+            padding: 10px;
+        }
+        
+        .media-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        
+        .media-size {
+            color: #666;
+            font-size: 0.8em;
+            margin-bottom: 10px;
+        }
+        
+        .media-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+EOF
+
+# 在header-nav中添加媒体管理按钮
+sed -i '/<button class="nav-btn" onclick="showSection('"'"'comments'"'"')">评论系统<\/button>/a\                <button class="nav-btn" onclick="showSection('"'"'media'"'"')">媒体管理</button>' frontend/index.html
+```
+
+#### 6.7 第四阶段: DevOps自动化与CI/CD实现 (3小时)
+
+**步骤1: 设置GitHub Actions工作流**
+```bash
+# 创建CI/CD配置目录
+mkdir -p .github/workflows
+mkdir -p scripts/ci-cd
+
+# 创建主要的CI/CD工作流
+cat > .github/workflows/deploy.yml << 'EOF'
+name: Deploy Blog Microservices
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test123
+          MYSQL_DATABASE: blog_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+    - name: Checkout代码
+      uses: actions/checkout@v4
+
+    - name: 设置Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: |
+          services/user-service/package-lock.json
+          services/post-service/package-lock.json
+          services/comment-service/package-lock.json
+
+    - name: 安装依赖并测试用户服务
+      run: |
+        cd services/user-service
+        npm ci
+        npm run test
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_NAME: blog_test
+        DB_USER: root
+        DB_PASSWORD: test123
+        REDIS_HOST: localhost
+
+    - name: 安装依赖并测试文章服务
+      run: |
+        cd services/post-service
+        npm ci
+        npm run test
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_NAME: blog_test
+        DB_USER: root
+        DB_PASSWORD: test123
+        REDIS_HOST: localhost
+
+    - name: 安装依赖并测试评论服务
+      run: |
+        cd services/comment-service
+        npm ci
+        npm run test
+      env:
+        NODE_ENV: test
+        DB_HOST: localhost
+        DB_NAME: blog_test
+        DB_USER: root
+        DB_PASSWORD: test123
+
+    - name: 代码质量检查
+      run: |
+        # 安装ESLint
+        npm install -g eslint
+        
+        # 检查所有服务的代码质量
+        for service in user-service post-service comment-service; do
+          echo "检查 $service 代码质量..."
+          cd services/$service
+          npx eslint . --ext .js --fix-dry-run
+          cd ../..
+        done
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    strategy:
+      matrix:
+        service: [user-service, post-service, comment-service, media-service]
+
+    steps:
+    - name: Checkout代码
+      uses: actions/checkout@v4
+
+    - name: 设置Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: 登录GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.DOCKER_REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 提取元数据
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_PREFIX }}/${{ matrix.service }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: 构建并推送Docker镜像
+      uses: docker/build-push-action@v5
+      with:
+        context: ./services/${{ matrix.service }}
+        file: ./services/${{ matrix.service }}/Dockerfile.prod
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+
+    steps:
+    - name: Checkout代码
+      uses: actions/checkout@v4
+
+    - name: 部署到测试环境
+      run: |
+        echo "部署到测试环境..."
+        # 这里可以添加具体的部署脚本
+        ./scripts/ci-cd/deploy-staging.sh
+      env:
+        DEPLOY_HOST: ${{ secrets.STAGING_HOST }}
+        DEPLOY_USER: ${{ secrets.STAGING_USER }}
+        DEPLOY_KEY: ${{ secrets.STAGING_SSH_KEY }}
+
+  deploy-production:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+    - name: Checkout代码
+      uses: actions/checkout@v4
+
+    - name: 生产环境健康检查
+      run: |
+        echo "检查生产环境状态..."
+        ./scripts/ci-cd/health-check.sh
+      env:
+        PROD_HOST: ${{ secrets.PRODUCTION_HOST }}
+
+    - name: 蓝绿部署到生产环境
+      run: |
+        echo "执行蓝绿部署..."
+        ./scripts/ci-cd/deploy-production.sh
+      env:
+        DEPLOY_HOST: ${{ secrets.PRODUCTION_HOST }}
+        DEPLOY_USER: ${{ secrets.PRODUCTION_USER }}
+        DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+        DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+        IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
+
+    - name: 部署后验证
+      run: |
+        echo "验证部署结果..."
+        ./scripts/ci-cd/post-deploy-test.sh
+      env:
+        PROD_URL: ${{ secrets.PRODUCTION_URL }}
+
+  cleanup:
+    needs: [deploy-staging, deploy-production]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: 清理旧镜像
+      run: |
+        echo "清理旧的Docker镜像..."
+        # 保留最近的5个版本
+        for service in user-service post-service comment-service media-service; do
+          echo "清理 $service 旧镜像..."
+        done
+EOF
+
+# 创建部署脚本
+cat > scripts/ci-cd/deploy-staging.sh << 'EOF'
+#!/bin/bash
+
+set -e
+
+echo "🚀 开始部署到测试环境..."
+
+# 配置变量
+COMPOSE_FILE="deployment/staging/docker-compose.staging.yml"
+BACKUP_DIR="/opt/backups/$(date +%Y%m%d_%H%M%S)"
+
+# 创建备份
+echo "📦 创建数据备份..."
+mkdir -p "$BACKUP_DIR"
+docker exec mysql-staging mysqldump -u root -p$MYSQL_ROOT_PASSWORD blog_system > "$BACKUP_DIR/database.sql"
+
+# 拉取最新镜像
+echo "📥 拉取最新镜像..."
+docker-compose -f "$COMPOSE_FILE" pull
+
+# 滚动更新服务
+echo "🔄 执行滚动更新..."
+for service in user-service post-service comment-service media-service; do
+    echo "更新 $service..."
+    docker-compose -f "$COMPOSE_FILE" up -d --no-deps "$service"
+    
+    # 等待服务启动
+    sleep 10
+    
+    # 健康检查
+    if ! docker-compose -f "$COMPOSE_FILE" exec "$service" curl -f http://localhost:3001/health; then
+        echo "❌ $service 健康检查失败，回滚..."
+        docker-compose -f "$COMPOSE_FILE" rollback "$service"
+        exit 1
+    fi
+done
+
+echo "✅ 测试环境部署完成！"
+EOF
+
+cat > scripts/ci-cd/deploy-production.sh << 'EOF'
+#!/bin/bash
+
+set -e
+
+echo "🚀 开始生产环境蓝绿部署..."
+
+# 配置变量
+BLUE_COMPOSE="deployment/production/docker-compose.blue.yml"
+GREEN_COMPOSE="deployment/production/docker-compose.green.yml"
+CURRENT_ENV_FILE="/opt/deployment/current_environment"
+BACKUP_DIR="/opt/backups/production/$(date +%Y%m%d_%H%M%S)"
+
+# 检查当前活跃环境
+if [ -f "$CURRENT_ENV_FILE" ]; then
+    CURRENT_ENV=$(cat "$CURRENT_ENV_FILE")
+else
+    CURRENT_ENV="blue"
+fi
+
+# 确定部署目标环境
+if [ "$CURRENT_ENV" = "blue" ]; then
+    TARGET_ENV="green"
+    TARGET_COMPOSE="$GREEN_COMPOSE"
+    INACTIVE_COMPOSE="$BLUE_COMPOSE"
+else
+    TARGET_ENV="blue"
+    TARGET_COMPOSE="$BLUE_COMPOSE"
+    INACTIVE_COMPOSE="$GREEN_COMPOSE"
+fi
+
+echo "📊 当前环境: $CURRENT_ENV, 部署目标: $TARGET_ENV"
+
+# 创建完整备份
+echo "📦 创建生产数据备份..."
+mkdir -p "$BACKUP_DIR"
+docker exec mysql-production mysqldump -u root -p$MYSQL_ROOT_PASSWORD --single-transaction blog_system > "$BACKUP_DIR/database.sql"
+docker exec redis-production redis-cli --rdb "$BACKUP_DIR/redis.rdb"
+
+# 部署到目标环境
+echo "🔄 部署到 $TARGET_ENV 环境..."
+docker-compose -f "$TARGET_COMPOSE" pull
+docker-compose -f "$TARGET_COMPOSE" up -d
+
+# 等待服务完全启动
+echo "⏳ 等待服务启动..."
+sleep 30
+
+# 健康检查
+echo "🏥 执行健康检查..."
+HEALTH_CHECK_PASSED=true
+
+for service in user-service post-service comment-service media-service; do
+    echo "检查 $service..."
+    for i in {1..5}; do
+        if docker-compose -f "$TARGET_COMPOSE" exec "$service" curl -f http://localhost:3001/health; then
+            echo "✅ $service 健康检查通过"
+            break
+        else
+            echo "⚠️ $service 健康检查失败，重试 $i/5..."
+            if [ $i -eq 5 ]; then
+                HEALTH_CHECK_PASSED=false
+                echo "❌ $service 健康检查最终失败"
+            fi
+            sleep 10
+        fi
+    done
+done
+
+if [ "$HEALTH_CHECK_PASSED" = "false" ]; then
+    echo "❌ 健康检查失败，取消部署"
+    docker-compose -f "$TARGET_COMPOSE" down
+    exit 1
+fi
+
+# 切换流量
+echo "🔄 切换生产流量到 $TARGET_ENV..."
+# 更新负载均衡器配置
+sed -i "s/upstream backend {/upstream backend {\n    # $TARGET_ENV environment/" /etc/nginx/nginx.conf
+
+# 重新加载nginx配置
+nginx -s reload
+
+# 验证流量切换
+echo "🔍 验证流量切换..."
+sleep 10
+
+# 检查新环境是否正常响应
+if curl -f "http://localhost/api/health"; then
+    echo "✅ 流量切换成功"
+    
+    # 停止旧环境
+    echo "🛑 停止旧环境 $CURRENT_ENV..."
+    docker-compose -f "$INACTIVE_COMPOSE" down
+    
+    # 更新当前环境标记
+    echo "$TARGET_ENV" > "$CURRENT_ENV_FILE"
+    
+    echo "🎉 生产环境部署完成！当前活跃环境: $TARGET_ENV"
+else
+    echo "❌ 流量切换验证失败，回滚..."
+    
+    # 回滚nginx配置
+    nginx -s reload
+    
+    # 停止新环境
+    docker-compose -f "$TARGET_COMPOSE" down
+    
+    exit 1
+fi
+EOF
+
+cat > scripts/ci-cd/health-check.sh << 'EOF'
+#!/bin/bash
+
+set -e
+
+echo "🏥 执行生产环境健康检查..."
+
+# 检查服务状态
+SERVICES=("user-service" "post-service" "comment-service" "media-service")
+FAILED_SERVICES=()
+
+for service in "${SERVICES[@]}"; do
+    echo "检查 $service..."
+    
+    if curl -f --max-time 10 "http://$PROD_HOST/api/health/$service"; then
+        echo "✅ $service 健康"
+    else
+        echo "❌ $service 不健康"
+        FAILED_SERVICES+=("$service")
+    fi
+done
+
+# 检查数据库连接
+echo "检查数据库连接..."
+if curl -f --max-time 10 "http://$PROD_HOST/api/health/database"; then
+    echo "✅ 数据库连接正常"
+else
+    echo "❌ 数据库连接异常"
+    FAILED_SERVICES+=("database")
+fi
+
+# 检查Redis连接
+echo "检查Redis连接..."
+if curl -f --max-time 10 "http://$PROD_HOST/api/health/redis"; then
+    echo "✅ Redis连接正常"
+else
+    echo "❌ Redis连接异常"
+    FAILED_SERVICES+=("redis")
+fi
+
+# 总结结果
+if [ ${#FAILED_SERVICES[@]} -eq 0 ]; then
+    echo "🎉 所有健康检查通过！"
+    exit 0
+else
+    echo "❌ 以下服务健康检查失败: ${FAILED_SERVICES[*]}"
+    exit 1
+fi
+EOF
+
+cat > scripts/ci-cd/post-deploy-test.sh << 'EOF'
+#!/bin/bash
+
+set -e
+
+echo "🧪 执行部署后验证测试..."
+
+BASE_URL="$PROD_URL"
+
+# 测试用户注册和登录
+echo "测试用户功能..."
+REGISTER_RESPONSE=$(curl -s -X POST "$BASE_URL/api/users/register" \
+    -H "Content-Type: application/json" \
+    -d '{"username":"testuser","email":"test@example.com","password":"test123"}')
+
+if echo "$REGISTER_RESPONSE" | grep -q "success"; then
+    echo "✅ 用户注册测试通过"
+else
+    echo "❌ 用户注册测试失败"
+    exit 1
+fi
+
+# 测试文章功能
+echo "测试文章功能..."
+POST_RESPONSE=$(curl -s -X POST "$BASE_URL/api/posts" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TEST_TOKEN" \
+    -d '{"title":"测试文章","content":"这是一篇测试文章"}')
+
+if echo "$POST_RESPONSE" | grep -q "success"; then
+    echo "✅ 文章发布测试通过"
+else
+    echo "❌ 文章发布测试失败"
+    exit 1
+fi
+
+# 测试评论功能
+echo "测试评论功能..."
+COMMENT_RESPONSE=$(curl -s -X POST "$BASE_URL/api/comments" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $TEST_TOKEN" \
+    -d '{"postId":1,"content":"这是一条测试评论"}')
+
+if echo "$COMMENT_RESPONSE" | grep -q "success"; then
+    echo "✅ 评论功能测试通过"
+else
+    echo "❌ 评论功能测试失败"
+    exit 1
+fi
+
+# 测试媒体上传
+echo "测试媒体上传..."
+# 创建测试图片
+echo -e "\x89PNG\r\n\x1a\n" > test.png
+MEDIA_RESPONSE=$(curl -s -X POST "$BASE_URL/api/media/upload" \
+    -H "Authorization: Bearer $TEST_TOKEN" \
+    -F "file=@test.png")
+
+if echo "$MEDIA_RESPONSE" | grep -q "url"; then
+    echo "✅ 媒体上传测试通过"
+    rm test.png
+else
+    echo "❌ 媒体上传测试失败"
+    rm test.png
+    exit 1
+fi
+
+echo "🎉 所有部署后验证测试通过！"
+EOF
+
+# 为脚本添加执行权限
+chmod +x scripts/ci-cd/*.sh
+```
+
+**步骤2: 设置生产环境蓝绿部署配置**
+```bash
+# 创建蓝绿部署配置
+cat > deployment/production/docker-compose.blue.yml << 'EOF'
+version: '3.8'
+
+services:
+  # 蓝环境 - 服务配置
+  user-service-blue:
+    image: ${DOCKER_REGISTRY}/${IMAGE_PREFIX}/user-service:${IMAGE_TAG}
     environment:
       - NODE_ENV=production
-      - LOG_LEVEL=info
-```
+      - PORT=3001
+      - DB_HOST=database-production
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_HOST=redis-production
+      - SERVICE_ENV=blue
+    networks:
+      - blue-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-#### 6.4 监控和日志配置
-```yaml
-# 添加监控服务
-  prometheus:
-    image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-    restart: unless-stopped
-
-  grafana:
-    image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
+  post-service-blue:
+    image: ${DOCKER_REGISTRY}/${IMAGE_PREFIX}/post-service:${IMAGE_TAG}
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
-    volumes:
-      - grafana_data:/var/lib/grafana
-    restart: unless-stopped
+      - NODE_ENV=production
+      - PORT=3002
+      - DB_HOST=database-production
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=redis-production
+      - SERVICE_ENV=blue
+    networks:
+      - blue-network
+    deploy:
+      replicas: 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+
+  comment-service-blue:
+    image: ${DOCKER_REGISTRY}/${IMAGE_PREFIX}/comment-service:${IMAGE_TAG}
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - DB_HOST=database-production
+      - DB_NAME=blog_system
+      - DB_USER=bloguser
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SERVICE_ENV=blue
+    networks:
+      - blue-network
+    deploy:
+      replicas: 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+
+  media-service-blue:
+    image: ${DOCKER_REGISTRY}/${IMAGE_PREFIX}/media-service:${IMAGE_TAG}
+    environment:
+      - NODE_ENV=production
+      - PORT=3004
+      - MINIO_ENDPOINT=minio-production
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - SERVICE_ENV=blue
+    networks:
+      - blue-network
+    deploy:
+      replicas: 2
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+
+networks:
+  blue-network:
+    external: true
+EOF
+
+# 绿环境配置（类似蓝环境，但使用不同的网络和标识）
+cp deployment/production/docker-compose.blue.yml deployment/production/docker-compose.green.yml
+sed -i 's/blue/green/g' deployment/production/docker-compose.green.yml
 ```
 
-### 🎪 最终项目: 生产就绪的个人博客系统
+**步骤3: 配置监控和告警**
+```bash
+# 创建Prometheus告警规则
+cat > infrastructure/prometheus/alert-rules.yml << 'EOF'
+groups:
+- name: blog-microservices
+  rules:
+  - alert: ServiceDown
+    expr: up{job=~"user-service|post-service|comment-service|media-service"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "服务 {{ $labels.job }} 已下线"
+      description: "{{ $labels.job }} 在 {{ $labels.instance }} 上已下线超过1分钟"
 
-**项目目标**: 完成具有以下特性的完整博客系统
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.service }} 错误率过高"
+      description: "{{ $labels.service }} 的错误率在过去5分钟内超过10%"
 
-#### 功能特性清单:
+  - alert: HighMemoryUsage
+    expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.8
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.name }} 内存使用率过高"
+      description: "容器 {{ $labels.name }} 内存使用率超过80%"
+
+  - alert: DatabaseConnectionFail
+    expr: mysql_up == 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "数据库连接失败"
+      description: "MySQL数据库连接不可用"
+
+- name: business-metrics
+  rules:
+  - alert: HighUserRegistration
+    expr: increase(user_registrations_total[1h]) > 100
+    labels:
+      severity: info
+    annotations:
+      summary: "用户注册量激增"
+      description: "过去1小时用户注册量超过100个"
+
+  - alert: LowPostCreation
+    expr: increase(posts_created_total[24h]) < 5
+    labels:
+      severity: warning
+    annotations:
+      summary: "文章发布量过低"
+      description: "过去24小时文章发布量少于5篇"
+EOF
+
+# 创建Grafana告警通知配置
+cat > infrastructure/grafana/notification-channels.yml << 'EOF'
+apiVersion: 1
+
+notifiers:
+  - name: slack-alerts
+    type: slack
+    uid: slack001
+    settings:
+      url: ${SLACK_WEBHOOK_URL}
+      username: Grafana
+      channel: '#devops-alerts'
+      iconEmoji: ':exclamation:'
+      title: 'Blog System Alert'
+      text: |
+        {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Status: {{ .Status }}
+        {{ end }}
+
+  - name: email-alerts
+    type: email
+    uid: email001
+    settings:
+      addresses: ${ALERT_EMAIL_LIST}
+      subject: 'Blog System Alert - {{ .GroupLabels.alertname }}'
+
+delete_notifiers:
+  - name: slack-alerts
+    uid: slack001
+  - name: email-alerts
+    uid: email001
+EOF
 ```
-✅ 用户管理
-  - 用户注册/登录/注销
-  - 个人资料管理
-  - 头像上传
 
-✅ 文章管理
-  - 富文本编辑器
-  - 文章发布/编辑/删除
-  - 标签和分类管理
-  - 文章搜索功能
+**步骤4: 创建自动化部署管道**
+```bash
+# 创建完整的部署管道脚本
+cat > scripts/ci-cd/full-pipeline.sh << 'EOF'
+#!/bin/bash
 
-✅ 评论系统
-  - 多级评论回复
-  - 评论审核机制
-  - 垃圾评论过滤
+set -e
 
-✅ 系统特性
-  - 响应式设计
-  - SEO优化
-  - 缓存策略
-  - 图片压缩和CDN
+echo "🚀 启动完整部署管道..."
+
+# 配置变量
+ENVIRONMENT=${1:-staging}
+BRANCH=${2:-develop}
+SKIP_TESTS=${3:-false}
+
+case $ENVIRONMENT in
+    staging)
+        echo "📦 部署到测试环境..."
+        COMPOSE_FILE="deployment/staging/docker-compose.staging.yml"
+        ;;
+    production)
+        echo "🏭 部署到生产环境..."
+        COMPOSE_FILE="deployment/production/docker-compose.prod.yml"
+        ;;
+    *)
+        echo "❌ 不支持的环境: $ENVIRONMENT"
+        exit 1
+        ;;
+esac
+
+# 阶段1: 代码检查
+echo "🔍 阶段1: 代码质量检查..."
+if [ "$SKIP_TESTS" != "true" ]; then
+    ./scripts/ci-cd/run-tests.sh
+    ./scripts/ci-cd/code-quality-check.sh
+fi
+
+# 阶段2: 构建镜像
+echo "🔨 阶段2: 构建Docker镜像..."
+./scripts/ci-cd/build-images.sh $ENVIRONMENT
+
+# 阶段3: 安全扫描
+echo "🛡️ 阶段3: 安全扫描..."
+./scripts/ci-cd/security-scan.sh
+
+# 阶段4: 部署
+echo "🚀 阶段4: 执行部署..."
+if [ "$ENVIRONMENT" = "production" ]; then
+    ./scripts/ci-cd/deploy-production.sh
+else
+    ./scripts/ci-cd/deploy-staging.sh
+fi
+
+# 阶段5: 部署后验证
+echo "✅ 阶段5: 部署后验证..."
+./scripts/ci-cd/post-deploy-test.sh
+
+# 阶段6: 通知
+echo "📧 阶段6: 发送部署通知..."
+./scripts/ci-cd/send-notification.sh "success" "$ENVIRONMENT" "$BRANCH"
+
+echo "🎉 部署管道执行完成！"
+EOF
+
+# 创建代码质量检查脚本
+cat > scripts/ci-cd/code-quality-check.sh << 'EOF'
+#!/bin/bash
+
+set -e
+
+echo "🔍 执行代码质量检查..."
+
+# ESLint检查
+echo "运行ESLint..."
+for service in user-service post-service comment-service media-service; do
+    if [ -d "services/$service" ]; then
+        echo "检查 $service..."
+        cd services/$service
+        npx eslint . --ext .js --format json --output-file ../../reports/eslint-$service.json || true
+        cd ../..
+    fi
+done
+
+# 代码复杂度检查
+echo "运行代码复杂度分析..."
+npm install -g complexity-report
+for service in user-service post-service comment-service media-service; do
+    if [ -d "services/$service" ]; then
+        echo "分析 $service 复杂度..."
+        cr services/$service/**/*.js --format json --output reports/complexity-$service.json || true
+    fi
+done
+
+# 依赖安全检查
+echo "运行依赖安全检查..."
+for service in user-service post-service comment-service media-service; do
+    if [ -d "services/$service" ]; then
+        echo "检查 $service 依赖安全..."
+        cd services/$service
+        npm audit --audit-level moderate --json > ../../reports/audit-$service.json || true
+        cd ../..
+    fi
+done
+
+echo "✅ 代码质量检查完成！"
+EOF
+
+# 创建安全扫描脚本
+cat > scripts/ci-cd/security-scan.sh << 'EOF'
+#!/bin/bash
+
+set -e
+
+echo "🛡️ 执行安全扫描..."
+
+# 创建报告目录
+mkdir -p reports/security
+
+# Docker镜像安全扫描
+echo "扫描Docker镜像安全性..."
+for service in user-service post-service comment-service media-service; do
+    echo "扫描 $service 镜像..."
+    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+        -v "$(pwd)/reports/security:/tmp/reports" \
+        aquasec/trivy:latest image \
+        --format json --output /tmp/reports/trivy-$service.json \
+        blog-microservices/$service:latest || true
+done
+
+# 容器配置安全检查
+echo "检查容器配置安全性..."
+docker run --rm -v "$(pwd):/workspace" \
+    -v "$(pwd)/reports/security:/tmp/reports" \
+    hadolint/hadolint:latest \
+    hadolint --format json /workspace/services/*/Dockerfile* > reports/security/hadolint.json || true
+
+# 网络安全扫描
+echo "执行网络安全扫描..."
+if command -v nmap &> /dev/null; then
+    nmap -sV -T4 localhost -p 80,443,3001-3004 > reports/security/nmap.txt || true
+fi
+
+echo "✅ 安全扫描完成！"
+EOF
+
+# 为所有脚本添加执行权限
+chmod +x scripts/ci-cd/*.sh
 ```
 
-#### 技术架构:
-```
-Frontend (React/Vue) → API Gateway (Nginx) → Microservices
-                                              ├── User Service
-                                              ├── Post Service
-                                              ├── Comment Service
-                                              └── Media Service
-                     ↓
-Data Layer: PostgreSQL + Redis + File Storage
-Monitoring: Prometheus + Grafana
-Logging: ELK Stack (可选)
+**🤖 AI辅助提示**: 使用Copilot生成完整的CI/CD配置、测试脚本和监控告警规则
+
+#### 6.8 Module 6 学习总结与成果展示
+
+**🎯 Module 6 核心成果**:
+
+1. **生产级微服务系统**
+   - 在Module 5基础上实现了完整的生产环境配置
+   - 集成了监控、日志、媒体服务等关键组件
+   - 实现了高可用、可扩展的系统架构
+
+2. **DevOps自动化流水线**
+   - GitHub Actions CI/CD管道
+   - 蓝绿部署策略
+   - 自动化测试和质量检查
+   - 安全扫描和合规性检查
+
+3. **完整的运维监控体系**
+   - Prometheus + Grafana监控仪表板
+   - 集中式日志管理
+   - 实时告警和通知机制
+   - 性能指标收集和分析
+
+**📊 与前续模块的技术演进对比**:
+
+| 能力维度 | Module 4 | Module 5 | Module 6 (本模块) |
+|----------|----------|----------|-------------------|
+| **架构复杂度** | 单体容器化 | 微服务化 | 生产级微服务 |
+| **服务数量** | 1个后端 | 3个微服务 | 7个服务组件 |
+| **监控能力** | 基础健康检查 | 简单监控 | 全方位可观测性 |
+| **部署策略** | 手动部署 | 半自动化 | 全自动CI/CD |
+| **可用性** | 单点故障 | 服务隔离 | 高可用容错 |
+| **运维复杂度** | 低 | 中等 | 高 (但自动化) |
+| **生产就绪度** | 开发环境 | 测试环境 | 生产环境 |
+
+**🚀 技能掌握验证清单**:
+
+- [ ] 能够设计和实现生产级Docker容器化系统
+- [ ] 熟练掌握微服务架构的监控和运维
+- [ ] 能够搭建完整的CI/CD自动化流水线  
+- [ ] 理解蓝绿部署、滚动更新等部署策略
+- [ ] 具备生产环境故障排查和性能优化能力
+- [ ] 能够设计和实现可观测性系统
+- [ ] 掌握容器化应用的安全最佳实践
+
+**💡 Module 6 学习心得模板**:
+```markdown
+## Module 6 学习总结
+
+### 技术收获
+1. **生产化改造经验**: 
+   - 从开发环境到生产环境的完整改造过程
+   - 性能优化和资源配置的实践经验
+
+2. **DevOps实践能力**:
+   - CI/CD流水线设计和实现
+   - 自动化测试和部署的完整流程
+
+3. **运维监控技能**:
+   - 监控系统设计和告警配置
+   - 日志管理和问题排查方法
+
+### 项目亮点
+- 成功将Module 5的微服务系统升级为生产级系统
+- 实现了完整的自动化部署和运维流程
+- 建立了comprehensive的监控和告警体系
+
+### 后续改进方向
+- [ ] 实现更细粒度的监控指标
+- [ ] 添加自动扩缩容功能
+- [ ] 集成更多安全扫描工具
+- [ ] 实现多环境配置管理
 ```
 
-**🤖 AI辅助提示**: 使用Copilot生成完整的前后端代码、API文档和部署脚本
+**🎉 Module 6 完成标志**:
+至此，您已经完成了从基础Docker容器化到生产级微服务系统的完整学习路径：
+- ✅ Module 4: 掌握了单容器应用的Docker化
+- ✅ Module 5: 实现了微服务架构设计和开发
+- ✅ Module 6: 完成了生产级系统的运维和自动化
+
+这个完整的项目展示了现代容器化应用从开发到生产的全生命周期管理能力！
 
 ---
 
